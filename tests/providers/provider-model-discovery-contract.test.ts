@@ -428,6 +428,27 @@ describe("registry-owned provider model discovery", () => {
     expect(cancelled).toBe(true);
   });
 
+  test("accepts the observed Nous mixed catalog within its provider-specific response cap", async () => {
+    const entry = PROVIDER_REGISTRY.find(row => row.id === "nous");
+    if (!entry) throw new Error("missing nous registry entry");
+    const discovery = resolveProviderModelDiscovery("nous", {
+      adapter: entry.adapter,
+      baseUrl: entry.baseUrl,
+      authMode: "oauth",
+    });
+    const payload = JSON.stringify({
+      data: Array.from({ length: 390 }, (_, index) => ({
+        id: index === 0 ? "tencent/hy3:free" : `vendor/model-${index}`,
+        metadata: { description: "x".repeat(1_400) },
+      })),
+    });
+
+    expect(new TextEncoder().encode(payload).byteLength).toBeGreaterThan(262_144);
+    expect(discovery.maxResponseBytes).toBe(1_048_576);
+    const result = await readBoundedDiscoveryJson(new Response(payload), discovery.maxResponseBytes);
+    expect(result.ok).toBe(true);
+  });
+
   test("rejects invalid UTF-8 before JSON parsing", async () => {
     const invalidUtf8Json = new Uint8Array([
       0x7b, 0x22, 0x78, 0x22, 0x3a, 0x22, 0xc3, 0x28, 0x22, 0x7d,
