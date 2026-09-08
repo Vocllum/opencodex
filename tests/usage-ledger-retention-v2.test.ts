@@ -1,7 +1,17 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { discardRequestHistoryProjection } from "../src/routing/history/discard-index";
+import { historyIndexPath } from "../src/routing/history/schema";
 import {
   DEFAULT_USAGE_LEDGER_MAX_BYTES,
   MIN_USAGE_LEDGER_MAX_BYTES,
@@ -143,6 +153,19 @@ describe("usage ledger retention v2", () => {
     expect(existsSync(tempPath)).toBe(true);
   });
 
+  test("discards the derived request-history database and sidecars from an isolated config home", () => {
+    const dir = home();
+    const path = historyIndexPath(dir);
+    writeFileSync(path, "main");
+    writeFileSync(`${path}-wal`, "wal");
+    writeFileSync(`${path}-shm`, "shm");
+
+    expect(discardRequestHistoryProjection(dir)).toBe(true);
+    expect(existsSync(path)).toBe(false);
+    expect(existsSync(`${path}-wal`)).toBe(false);
+    expect(existsSync(`${path}-shm`)).toBe(false);
+  });
+
   test("revision comparator detects a source mutation before commit", () => {
     const revision = { dev: 1, ino: 2, size: 3, mtimeMs: 4, ctimeMs: 5 };
     expect(usageLedgerRevisionMatches(revision, revision)).toBe(true);
@@ -181,7 +204,7 @@ describe("usage ledger retention v2", () => {
     expect(readFileSync(path, "utf8")).toBe(old + latest + appended);
   });
 
-  test("closes the derived history index before replacing an unchanged ledger", () => {
+  test("closes the derived history index before replace and discards it only after publication", () => {
     const dir = home();
     const path = join(dir, "usage.jsonl");
     const old = `${JSON.stringify({ requestId: "old", filler: "a".repeat(MIN_USAGE_LEDGER_MAX_BYTES) })}\n`;
@@ -191,18 +214,78 @@ describe("usage ledger retention v2", () => {
     if (!prepared.changed) throw new Error("expected compaction");
     const expected = readFileSync(prepared.tempPath, "utf8");
     let closed = false;
+    let replaced = false;
+    let discarded = false;
 
     const result = commitPreparedUsageLedgerCompaction(prepared, {
       activeTurnCount: () => 0,
       closeHistoryIndex: () => { closed = true; },
       rename: (from, to) => {
         expect(closed).toBe(true);
-        const { renameSync } = require("node:fs") as typeof import("node:fs");
         renameSync(from, to);
+        replaced = true;
+      },
+      discardHistoryProjection: configDir => {
+        expect(replaced).toBe(true);
+        expect(configDir).toBe(dir);
+        discarded = true;
+        return true;
       },
     });
     expect(result.ok).toBe(true);
     expect(result.droppedBytes).toBeGreaterThan(0);
+    expect(discarded).toBe(true);
     expect(readFileSync(path, "utf8")).toBe(expected);
+  });
+
+  test("derived projection cleanup failure does not reverse a successful canonical commit", () => {
+    const dir = home();
+    const path = join(dir, "usage.jsonl");
+    const old = `${JSON.stringify({ requestId: "old", filler: "a".repeat(MIN_USAGE_LEDGER_MAX_BYTES) })}\n`;
+    const latest = `${JSON.stringify({ requestId: "new" })}\n`;
+    writeFileSync(path, old + latest);
+    const prepared = prepareUsageLedgerCompaction(path, MIN_USAGE_LEDGER_MAX_BYTES);
+    if (!prepared.changed) throw new Error("expected compaction");
+    const expected = readFileSync(prepared.tempPath, "utf8");
+    const warn = console.warn;
+    console.warn = () => undefined;
+    try {
+      const result = commitPreparedUsageLedgerCompaction(prepared, {
+        activeTurnCount: () => 0,
+        rename: renameSync,
+        discardHistoryProjection: () => { throw new Error("projection busy"); },
+      });
+      expect(result.ok).toBe(true);
+      expect(readFileSync(path, "utf8")).toBe(expected);
+    } finally {
+      console.warn = warn;
+    }
+  });
+
+  test("does not discard the derived projection when canonical publication fails", () => {
+    const dir = home();
+    const path = join(dir, "usage.jsonl");
+    const old = `${JSON.stringify({ requestId: "old", filler: "a".repeat(MIN_USAGE_LEDGER_MAX_BYTES) })}\n`;
+    const latest = `${JSON.stringify({ requestId: "new" })}\n`;
+    const original = old + latest;
+    writeFileSync(path, original);
+    const prepared = prepareUsageLedgerCompaction(path, MIN_USAGE_LEDGER_MAX_BYTES);
+    if (!prepared.changed) throw new Error("expected compaction");
+    let discarded = false;
+
+    const result = commitPreparedUsageLedgerCompaction(prepared, {
+      activeTurnCount: () => 0,
+      closeHistoryIndex: () => undefined,
+      rename: () => { throw new Error("rename failed"); },
+      discardHistoryProjection: () => {
+        discarded = true;
+        return true;
+      },
+    });
+    expect(result.ok).toBe(false);
+    expect(result.error).toBe("commit_failed");
+    expect(discarded).toBe(false);
+    expect(existsSync(prepared.tempPath)).toBe(false);
+    expect(readFileSync(path, "utf8")).toBe(original);
   });
 });
