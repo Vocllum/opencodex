@@ -8,6 +8,7 @@ import { LanguageProvider } from "../src/i18n/provider";
 
 const globals = ["document", "window", "navigator", "localStorage", "IS_REACT_ACT_ENVIRONMENT"] as const;
 type GlobalName = (typeof globals)[number];
+const prioritySelector = "#codex-account-priority-pool-1";
 
 let previous: Record<GlobalName, PropertyDescriptor | undefined>;
 let testWindow: Window;
@@ -89,11 +90,11 @@ async function mount(priority: number): Promise<void> {
   });
 }
 
-test("default priority selector is rendered inside the open more-actions panel", async () => {
+test("default priority selector is rendered once inside the open more-actions panel", async () => {
   await mount(0);
   const more = host.querySelector<HTMLDetailsElement>("details.codex-account-more");
   expect(more).not.toBeNull();
-  expect(host.querySelector("#codex-account-priority-pool-1")).toBeNull();
+  expect(host.querySelectorAll(prioritySelector)).toHaveLength(0);
 
   await act(async () => {
     more!.querySelector<HTMLElement>("summary")!.click();
@@ -101,15 +102,17 @@ test("default priority selector is rendered inside the open more-actions panel",
   });
 
   expect(more!.open).toBe(true);
-  expect(more!.querySelector("#codex-account-priority-pool-1")).not.toBeNull();
-  expect(host.querySelector(".codex-account-identity #codex-account-priority-pool-1")).toBeNull();
+  expect(host.querySelectorAll(prioritySelector)).toHaveLength(1);
+  expect(more!.querySelector(prioritySelector)).not.toBeNull();
+  expect(host.querySelector(`.codex-account-identity ${prioritySelector}`)).toBeNull();
 });
 
-test("non-default priority selector stays inline and out of the closed disclosure", async () => {
+test("non-default priority selector is rendered once inline and out of the closed disclosure", async () => {
   await mount(2);
   const more = host.querySelector<HTMLDetailsElement>("details.codex-account-more");
   expect(more).not.toBeNull();
   expect(more!.open).toBe(false);
-  expect(more!.querySelector("#codex-account-priority-pool-1")).toBeNull();
-  expect(host.querySelector(".codex-account-identity #codex-account-priority-pool-1")).not.toBeNull();
+  expect(host.querySelectorAll(prioritySelector)).toHaveLength(1);
+  expect(more!.querySelector(prioritySelector)).toBeNull();
+  expect(host.querySelector(`.codex-account-identity ${prioritySelector}`)).not.toBeNull();
 });
