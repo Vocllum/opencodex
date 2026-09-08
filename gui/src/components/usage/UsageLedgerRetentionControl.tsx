@@ -41,11 +41,20 @@ export default function UsageLedgerRetentionControl({ apiBase }: { apiBase: stri
 
   const load = useCallback(async (signal?: AbortSignal) => {
     const generation = ++loadGeneration.current;
-    const response = await fetch(`${apiBase}/api/storage/usage-ledger-retention`, { signal });
-    if (!response.ok) throw new Error("load_failed");
-    const next = parseStatus(await response.json());
-    if (signal?.aborted || generation !== loadGeneration.current) return;
-    setStatus(next);
+    try {
+      const response = await fetch(`${apiBase}/api/storage/usage-ledger-retention`, { signal });
+      if (!response.ok) throw new Error("load_failed");
+      const next = parseStatus(await response.json());
+      if (signal?.aborted || generation !== loadGeneration.current) return;
+      setError(null);
+      setStatus(next);
+    } catch (errorValue) {
+      // A successful PUT invalidates reads that started under the old policy. Stale reads
+      // must be silent whether they eventually succeed, fail HTTP, reject, or parse badly.
+      if (signal?.aborted || generation !== loadGeneration.current
+        || (errorValue as { name?: string })?.name === "AbortError") return;
+      throw errorValue;
+    }
   }, [apiBase]);
 
   useEffect(() => {
