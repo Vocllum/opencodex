@@ -23,7 +23,7 @@ runs helper features around provider requests.
 | `corsAllowOrigins?` | `string[]` | `[]` | Additional exact origins allowed by CORS. Loopback origins are always allowed. Authority-based browser extension origins such as `chrome-extension://<extension-id>` are supported; `*` is not a wildcard. Firefox and Safari regenerate the extension UUID (per install / per browser launch), so update the entry when the origin changes. |
 | `apiKeys?` | `OcxApiKey[]` | `[]` | Generated `ocx_…` credentials accepted by management and data-plane auth on non-loopback binds. Dashboard-managed. |
 | `storageCleanupPolicy?` | `StorageCleanupPolicy` | disabled | Opt-in archived-session cleanup policy. Never enabled implicitly. |
-| `usageLedgerRetention?` | `UsageLedgerRetention` | disabled | Opt-in cap for the append-only `usage.jsonl` usage ledger. When enabled, the background scheduler compacts complete rows after the ledger exceeds `maxBytes`. |
+| `usageLedgerRetention?` | `UsageLedgerRetentionConfig` | disabled | Opt-in cap for the append-only `usage.jsonl` usage ledger. When enabled, the background scheduler compacts complete rows after the ledger exceeds `maxBytes`. |
 | `appOwnedMemoryBudgetMb?` | `number` | `256` | Cap in MiB for evictable app-owned logs, caches, blobs, and continuation payloads. Range 64–4096; not an RSS cap. |
 | `codexAutoStart?` | `boolean` | `true` | Let the Codex shim run `ocx ensure` before launching Codex. False makes ensure a no-op. |
 | `codexShimAutoRestore?` | `boolean` | `true` | Restore an installed shim after a completed external Codex update replaces it. Environment opt-out: `OPENCODEX_CODEX_SHIM_AUTO_RESTORE=0`. |

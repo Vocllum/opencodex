@@ -4,6 +4,9 @@ import { useT, type Locale } from "../../i18n/shared";
 
 const MIB = 1024 ** 2;
 const PRESETS_MIB = [128, 512, 1024, 2048] as const;
+// Keep the range useful for the common sizes while leaving the number field as
+// the precise escape hatch for larger policies.
+const SLIDER_MAX_MIB = 4096;
 
 interface RetentionJobState {
   status: "idle" | "running";
@@ -137,54 +140,72 @@ export default function UsageLedgerRetentionPanel({
       <h3 className="stw-section-title">{t("storage.usageRetention.title")}</h3>
       <p className="stw-hint">{t("storage.usageRetention.help")}</p>
 
-      <div className="stw-kv-row">
-        <span>{t("storage.usageRetention.current")}</span>
-        <span className="stw-kv-mono">
-          {status ? formatBytes(status.currentBytes, locale) : "—"}
-        </span>
-      </div>
+      <div className="storage-retention-controls">
+        <div className="storage-retention-current">
+          <span className="muted">{t("storage.usageRetention.current")}</span>
+          <span className="stw-kv-mono">
+            {status ? formatBytes(status.currentBytes, locale) : "—"}
+          </span>
+        </div>
 
-      <label className="stw-kv-row" style={{ cursor: busy ? "default" : "pointer" }}>
-        <span>{t("storage.usageRetention.enabled")}</span>
-        <input
-          type="checkbox"
-          checked={enabled}
-          disabled={busy}
-          onChange={event => setEnabled(event.target.checked)}
-        />
-      </label>
+        <label className="storage-retention-enable">
+          <span>{t("storage.usageRetention.enabled")}</span>
+          <span className="toggle">
+            <input
+              type="checkbox"
+              checked={enabled}
+              disabled={busy}
+              onChange={event => setEnabled(event.target.checked)}
+              aria-label={t("storage.usageRetention.enabled")}
+            />
+            <span className="slider" aria-hidden="true" />
+          </span>
+        </label>
 
-      <div className="stw-kv-row" style={{ alignItems: "center", gap: 12 }}>
-        <span>{t("storage.usageRetention.limit")}</span>
-        <span style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div className="storage-retention-limit">
+          <span className="muted">{t("storage.usageRetention.limit")}</span>
           <input
-            type="number"
+            className="storage-retention-range"
+            type="range"
             min={1}
+            max={SLIDER_MAX_MIB}
             step={1}
-            value={limitMiB}
+            value={Math.min(SLIDER_MAX_MIB, normalizedLimitMiB)}
             disabled={busy}
             onChange={event => setLimitMiB(Number(event.target.value))}
             aria-label={t("storage.usageRetention.limit")}
-            style={{ width: 96 }}
           />
-          <span className="muted mono">{t("storage.usageRetention.unitMiB")}</span>
-        </span>
+          <span className="storage-retention-number">
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={limitMiB}
+              disabled={busy}
+              onChange={event => setLimitMiB(Number(event.target.value))}
+              aria-label={t("storage.usageRetention.limit")}
+            />
+            <span className="muted mono">{t("storage.usageRetention.unitMiB")}</span>
+          </span>
+        </div>
       </div>
 
-      <div className="storage-policy-actions" style={{ flexWrap: "wrap" }}>
-        {PRESETS_MIB.map(value => (
-          <button
-            key={value}
-            type="button"
-            className={`btn btn-ghost btn-sm${normalizedLimitMiB === value ? " active" : ""}`}
-            disabled={busy}
-            onClick={() => setLimitMiB(value)}
-          >
-            {value >= 1024
-              ? `${value / 1024} ${t("storage.usageRetention.unitGiB")}`
-              : `${value} ${t("storage.usageRetention.unitMiB")}`}
-          </button>
-        ))}
+      <div className="storage-policy-actions storage-retention-actions">
+        <div className="storage-retention-presets" aria-label={t("storage.usageRetention.limit")}>
+          {PRESETS_MIB.map(value => (
+            <button
+              key={value}
+              type="button"
+              className={`storage-retention-preset${normalizedLimitMiB === value ? " active" : ""}`}
+              disabled={busy}
+              onClick={() => setLimitMiB(value)}
+            >
+              {value >= 1024
+                ? `${value / 1024} ${t("storage.usageRetention.unitGiB")}`
+                : `${value} ${t("storage.usageRetention.unitMiB")}`}
+            </button>
+          ))}
+        </div>
         <button type="button" className="btn btn-sm" disabled={busy} onClick={() => void save()}>
           {busyAction === "save" ? t("storage.usageRetention.saving") : t("storage.usageRetention.save")}
         </button>

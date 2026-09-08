@@ -235,6 +235,113 @@
   padding: 4px 0 12px;
 }
 
+/* Usage-ledger retention stays on one compact control line when there is room.
+   The number field remains the exact-value control; the native range is a quick
+   way to move through the usual sizes without turning presets into a second
+   row of button chrome. */
+.storage-retention-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px 16px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+
+.storage-retention-current,
+.storage-retention-enable {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  flex: 0 0 auto;
+  min-height: var(--control-sm);
+  white-space: nowrap;
+}
+
+.storage-retention-enable {
+  cursor: pointer;
+}
+
+.storage-retention-enable:has(input:disabled) {
+  cursor: default;
+}
+
+.storage-retention-limit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 20rem;
+  min-width: min(100%, 15rem);
+}
+
+.storage-retention-range {
+  flex: 1 1 auto;
+  min-width: 6rem;
+  accent-color: var(--accent);
+}
+
+.storage-retention-number {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: 0 0 auto;
+}
+
+.storage-retention-number input {
+  width: 5.5rem;
+  padding: 5px 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.storage-retention-actions {
+  gap: 8px 12px;
+  margin-top: 6px;
+}
+
+.storage-retention-presets {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.storage-retention-preset {
+  appearance: none;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-label);
+  line-height: var(--leading-ui);
+  padding: 4px 7px;
+  white-space: nowrap;
+  transition: background var(--motion-fast), color var(--motion-fast);
+}
+
+.storage-retention-preset:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+.storage-retention-preset.active {
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: var(--weight-semibold);
+}
+
+.storage-retention-preset:focus-visible {
+  outline: 2px solid var(--accent-ring);
+  outline-offset: 1px;
+}
+
+.storage-retention-preset:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 /* Largest-files rows — flat list, no card-in-card */
 .stw-file-row {
   display: flex;
