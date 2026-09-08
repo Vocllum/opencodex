@@ -5,6 +5,7 @@ const DEFAULT_INTERVAL_MS = 60_000;
 let timer: ReturnType<typeof setInterval> | null = null;
 let startupTimer: ReturnType<typeof setTimeout> | null = null;
 
+/** Request one background run only when the current persisted policy is enabled and over limit. */
 function requestIfOverLimit(): void {
   try {
     const status = getUsageLedgerRetentionStatus();
@@ -32,6 +33,7 @@ export function scheduleUsageLedgerRetentionStartupRun(): void {
   startupTimer.unref?.();
 }
 
+/** Stop both periodic and pending startup evaluations without touching an active Worker. */
 export function stopUsageLedgerRetentionScheduler(): void {
   if (timer) {
     clearInterval(timer);
