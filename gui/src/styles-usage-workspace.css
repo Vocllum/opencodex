@@ -241,6 +241,29 @@
   max-width: 68ch;
 }
 
+.usage-retention-editor {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.usage-retention-limit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.usage-retention-limit .field-label {
+  white-space: nowrap;
+}
+
+.usage-retention-editor .codex-auto-switch-input {
+  width: 104px;
+}
+
 .usage-retention-current {
   margin: 0;
   white-space: nowrap;

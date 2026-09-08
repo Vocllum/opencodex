@@ -887,6 +887,8 @@ export const ru: Record<TKey, string> = {
   "usage.retention.enabled": "Ограничить размер истории использования",
   "usage.retention.current": "Текущий размер",
   "usage.retention.limit": "Максимальный размер",
+  "usage.retention.increase": "Увеличить максимальный размер",
+  "usage.retention.decrease": "Уменьшить максимальный размер",
   "usage.retention.unlimited": "Без ограничений",
   "usage.retention.error": "Не удалось обновить ограничение размера истории использования.",
   "usage.retention.disabled": "Без ограничений — автоматическое сжатие истории выключено.",

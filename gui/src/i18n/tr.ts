@@ -906,6 +906,8 @@ export const tr: Record<TKey, string> = {
   "usage.retention.enabled": "Kullanım geçmişi boyutunu sınırla",
   "usage.retention.current": "Geçerli boyut",
   "usage.retention.limit": "Maksimum boyut",
+  "usage.retention.increase": "Maksimum boyutu artır",
+  "usage.retention.decrease": "Maksimum boyutu azalt",
   "usage.retention.unlimited": "Sınırsız",
   "usage.retention.error": "Kullanım geçmişi boyut sınırı güncellenemedi.",
   "usage.retention.disabled": "Sınırsız — otomatik geçmiş sıkıştırması kapalı.",

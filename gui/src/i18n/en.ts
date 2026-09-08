@@ -917,6 +917,8 @@ export const en = {
   "usage.retention.enabled": "Limit usage history size",
   "usage.retention.current": "Current size",
   "usage.retention.limit": "Maximum size",
+  "usage.retention.increase": "Increase maximum size",
+  "usage.retention.decrease": "Decrease maximum size",
   "usage.retention.unlimited": "Unlimited",
   "usage.retention.error": "Could not update the usage history limit.",
   "usage.retention.disabled": "Unlimited — automatic history compaction is off.",

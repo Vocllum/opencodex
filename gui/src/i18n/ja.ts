@@ -832,6 +832,8 @@ export const ja: Record<TKey, string> = {
   "usage.retention.enabled": "使用履歴のサイズを制限",
   "usage.retention.current": "現在のサイズ",
   "usage.retention.limit": "最大サイズ",
+  "usage.retention.increase": "最大サイズを増やす",
+  "usage.retention.decrease": "最大サイズを減らす",
   "usage.retention.unlimited": "無制限",
   "usage.retention.error": "使用履歴のサイズ上限を更新できませんでした。",
   "usage.retention.disabled": "無制限 — 使用履歴の自動圧縮はオフです。",

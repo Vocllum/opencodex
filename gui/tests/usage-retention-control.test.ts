@@ -217,6 +217,51 @@ test("a stale failed GET is silent after a successful toggle", async () => {
   expect(host.querySelector('[role="alert"]')).toBeNull();
 });
 
+test("shows a custom MiB editor only when enabled and saves the edited ceiling", async () => {
+  const apiBase = "http://usage-retention-custom";
+  const initialMaxBytes = 768 * 1024 * 1024;
+  const writes: Array<{ enabled: boolean; maxBytes: number }> = [];
+  let maxBytes = initialMaxBytes;
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url !== `${apiBase}/api/storage/usage-ledger-retention`) throw new Error(`unexpected fetch: ${url}`);
+    if ((init?.method ?? "GET") === "PUT") {
+      const body = JSON.parse(String(init?.body)) as { enabled: boolean; maxBytes: number };
+      writes.push(body);
+      maxBytes = body.maxBytes;
+      return Response.json({ enabled: body.enabled, maxBytes, currentBytes: 1234 });
+    }
+    return Response.json({ enabled: true, maxBytes, currentBytes: 1234 });
+  }) as typeof fetch;
+
+  await mount(apiBase);
+
+  const input = host.querySelector<HTMLInputElement>('input[type="number"]');
+  if (!input) throw new Error("custom retention input missing");
+  expect(input.value).toBe("768");
+  expect(input.min).toBe("1");
+  expect(host.querySelector('[aria-haspopup="listbox"]')).toBeNull();
+
+  const increment = input.parentElement?.querySelector<HTMLButtonElement>(".ocx-stepper__btn");
+  if (!increment) throw new Error("retention stepper missing");
+  await act(async () => { increment.click(); });
+  await act(async () => { input.focus(); });
+  await act(async () => {
+    input.dispatchEvent(new testWindow.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    await Promise.resolve();
+  });
+  expect(writes).toEqual([{ enabled: true, maxBytes: 769 * 1024 * 1024 }]);
+
+  const toggle = host.querySelector<HTMLButtonElement>("button.switch");
+  if (!toggle) throw new Error("retention switch missing");
+  await act(async () => {
+    toggle.click();
+    await Promise.resolve();
+  });
+  expect(host.querySelector('input[type="number"]')).toBeNull();
+});
+
 test("failed toggle keeps the last server state and surfaces an error", async () => {
   const apiBase = "http://usage-retention-failure";
   const maxBytes = 256 * 1024 * 1024;

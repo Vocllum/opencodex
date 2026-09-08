@@ -712,6 +712,8 @@ export const zhTW: Record<TKey, string> = {
   "usage.retention.enabled": "限制用量歷史大小",
   "usage.retention.current": "目前大小",
   "usage.retention.limit": "最大大小",
+  "usage.retention.increase": "增大最大大小",
+  "usage.retention.decrease": "減小最大大小",
   "usage.retention.unlimited": "無限制",
   "usage.retention.error": "無法更新用量歷史大小限制。",
   "usage.retention.disabled": "無限制 — 自動壓縮用量歷史已關閉。",

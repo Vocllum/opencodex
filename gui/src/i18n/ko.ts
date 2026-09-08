@@ -900,6 +900,8 @@ export const ko: Record<TKey, string> = {
   "usage.retention.enabled": "사용 기록 크기 제한",
   "usage.retention.current": "현재 크기",
   "usage.retention.limit": "최대 크기",
+  "usage.retention.increase": "최대 크기 늘리기",
+  "usage.retention.decrease": "최대 크기 줄이기",
   "usage.retention.unlimited": "제한 없음",
   "usage.retention.error": "사용 기록 크기 제한을 업데이트할 수 없습니다.",
   "usage.retention.disabled": "제한 없음 — 자동 사용 기록 압축이 꺼져 있습니다.",

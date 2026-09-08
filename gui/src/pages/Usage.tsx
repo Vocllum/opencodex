@@ -943,8 +943,6 @@ export default function Usage({ apiBase, connected = false, apiKeyId }: { apiBas
         </div>
       )}
 
-      <UsageLedgerRetentionControl apiBase={apiBase} />
-
       {state.showSkeleton && !data ? (
         <DataSurfaceSkeleton label={t("usage.loading")} rows={5} />
       ) : state.kind === "failed-cold" ? (
@@ -992,6 +990,7 @@ export default function Usage({ apiBase, connected = false, apiKeyId }: { apiBas
           />
         </>
       )}
+      <UsageLedgerRetentionControl apiBase={apiBase} />
     </>
   );
 }

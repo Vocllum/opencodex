@@ -894,6 +894,8 @@ export const fr: Record<TKey, string> = {
   "usage.retention.enabled": "Limiter la taille de l’historique d’utilisation",
   "usage.retention.current": "Taille actuelle",
   "usage.retention.limit": "Taille maximale",
+  "usage.retention.increase": "Augmenter la taille maximale",
+  "usage.retention.decrease": "Réduire la taille maximale",
   "usage.retention.unlimited": "Illimitée",
   "usage.retention.error": "Impossible de mettre à jour la limite de l’historique d’utilisation.",
   "usage.retention.disabled": "Illimitée — la compression automatique de l’historique est désactivée.",

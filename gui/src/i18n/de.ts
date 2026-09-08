@@ -866,6 +866,8 @@ export const de: Record<TKey, string> = {
   "usage.retention.enabled": "Größe des Nutzungsverlaufs begrenzen",
   "usage.retention.current": "Aktuelle Größe",
   "usage.retention.limit": "Maximale Größe",
+  "usage.retention.increase": "Maximale Größe erhöhen",
+  "usage.retention.decrease": "Maximale Größe verringern",
   "usage.retention.unlimited": "Unbegrenzt",
   "usage.retention.error": "Das Größenlimit für den Nutzungsverlauf konnte nicht aktualisiert werden.",
   "usage.retention.disabled": "Unbegrenzt — automatische Verlaufskomprimierung ist deaktiviert.",
