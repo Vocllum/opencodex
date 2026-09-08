@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720" role="img" aria-labelledby="title desc">
+  <title id="title">OpenCodex Usage page usage history size limit</title>
+  <desc id="desc">A compact Usage page control with Unlimited selected, a disabled retention switch, current size information, and a native limit selector.</desc>
+  <rect width="1280" height="720" fill="#111318"/>
+  <rect x="48" y="32" width="1184" height="656" rx="18" fill="#181b22" stroke="#303540"/>
+  <text x="88" y="92" fill="#f2f4f8" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="34" font-weight="650">Usage</text>
+  <text x="88" y="124" fill="#9da5b3" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="16">Local token accounting from your proxy</text>
+  <line x1="88" y1="160" x2="1192" y2="160" stroke="#303540"/>
+  <text x="88" y="212" fill="#f2f4f8" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="20" font-weight="600">Usage history size limit</text>
+  <text x="88" y="242" fill="#9da5b3" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="15">Optionally keep the newest complete usage records within a size limit.</text>
+  <text x="1010" y="212" fill="#9da5b3" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14">Current size</text>
+  <text x="1010" y="239" fill="#f2f4f8" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="17">64 KiB</text>
+  <rect x="88" y="286" width="244" height="42" rx="9" fill="#252a34" stroke="#4a5362"/>
+  <circle cx="109" cy="307" r="8" fill="#687180"/>
+  <text x="127" y="313" fill="#c6ccd6" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="15">Limit usage history size</text>
+  <text x="360" y="312" fill="#9da5b3" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="15">Maximum size</text>
+  <rect x="478" y="286" width="192" height="42" rx="9" fill="#20242c" stroke="#697384"/>
+  <text x="498" y="312" fill="#f2f4f8" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="15">Unlimited</text>
+  <path d="m643 303 7 7 7-7" fill="none" stroke="#aeb6c3" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="88" y="366" fill="#9da5b3" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="14">Unlimited — automatic history compaction is off.</text>
+  <rect x="88" y="424" width="1104" height="180" rx="12" fill="#20242c"/>
+  <text x="116" y="470" fill="#c6ccd6" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="15">Requests</text>
+  <text x="116" y="524" fill="#f2f4f8" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="32">1,248</text>
+  <text x="392" y="470" fill="#c6ccd6" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="15">Total tokens</text>
+  <text x="392" y="524" fill="#f2f4f8" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="32">18.4M</text>
+  <text x="668" y="470" fill="#c6ccd6" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="15">Available history</text>
+  <text x="668" y="524" fill="#f2f4f8" font-family="ui-monospace,SFMono-Regular,Menlo,monospace" font-size="32">30d</text>
+  <text x="944" y="470" fill="#c6ccd6" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="15">Status</text>
+  <text x="944" y="524" fill="#9ed6b1" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="24" font-weight="600">Unlimited</text>
+</svg>
