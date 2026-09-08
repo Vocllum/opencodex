@@ -225,7 +225,7 @@
 
 .usage-retention-heading {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   min-width: 0;
@@ -242,23 +242,12 @@
 }
 
 .usage-retention-current {
-  flex: 0 0 auto;
+  margin: 0;
   white-space: nowrap;
-}
-
-.usage-retention-controls {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  flex-wrap: wrap;
-}
-
-.usage-retention-custom-input {
-  width: 120px;
 }
 
 @media (max-width: 640px) {
   .usage-source-row { align-items: flex-start; flex-direction: column; }
-  .usage-retention-heading { align-items: flex-start; flex-direction: column; gap: var(--space-1); }
+  .usage-retention-heading { align-items: flex-start; }
   .usage-retention-current { white-space: normal; }
 }
