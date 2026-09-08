@@ -11,6 +11,7 @@ import { DataSurfaceSkeleton } from "../components/data-surface";
 import { SectionTabs } from "../components/section-tabs";
 import { sectionAnchorId } from "../section-anchors";
 import { parseUsageTimeRange, type UsageRangeError, type UsageTimeWindow } from "../usage-time-range";
+import UsageLedgerRetentionControl from "../components/usage/UsageLedgerRetentionControl";
 
 type Range = "all" | "30d" | "7d";
 type UsageSurface = "all" | "codex" | "claude" | "grok";
@@ -941,6 +942,8 @@ export default function Usage({ apiBase, connected = false, apiKeyId }: { apiBas
           </div>
         </div>
       )}
+
+      <UsageLedgerRetentionControl apiBase={apiBase} />
 
       {state.showSkeleton && !data ? (
         <DataSurfaceSkeleton label={t("usage.loading")} rows={5} />
