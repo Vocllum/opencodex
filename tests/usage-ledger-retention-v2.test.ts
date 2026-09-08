@@ -14,10 +14,21 @@ import { commitPreparedUsageLedgerCompaction } from "../src/usage/ledger-retenti
 
 const homes: string[] = [];
 
+/** Allocate one isolated filesystem home and remember it for teardown. */
 function home(): string {
   const dir = mkdtempSync(join(tmpdir(), "ocx-ledger-retention-"));
   homes.push(dir);
   return dir;
+}
+
+/** Build one JSONL row whose encoded byte length is exactly `totalBytes`. */
+function jsonlRowOfSize(requestId: string, totalBytes: number, fill = "x"): string {
+  const empty = `${JSON.stringify({ requestId, filler: "" })}\n`;
+  const overhead = Buffer.byteLength(empty);
+  if (totalBytes < overhead) throw new Error("row target is smaller than JSONL overhead");
+  const row = `${JSON.stringify({ requestId, filler: fill.repeat(totalBytes - overhead) })}\n`;
+  if (Buffer.byteLength(row) !== totalBytes) throw new Error("row byte sizing drifted");
+  return row;
 }
 
 afterEach(() => {
@@ -74,11 +85,10 @@ describe("usage ledger retention v2", () => {
     expect(readFileSync(prepared.tempPath, "utf8")).toBe("");
   });
 
-  test("drops an unterminated crash tail", () => {
+  test("drops an unterminated crash tail while retaining a complete row at the ceiling", () => {
     const dir = home();
     const path = join(dir, "usage.jsonl");
-    const filler = "x".repeat(MIN_USAGE_LEDGER_MAX_BYTES);
-    const complete = `${JSON.stringify({ requestId: "complete", filler })}\n`;
+    const complete = jsonlRowOfSize("complete", MIN_USAGE_LEDGER_MAX_BYTES);
     const partial = JSON.stringify({ requestId: "partial", filler: "y".repeat(1024) });
     writeFileSync(path, complete + partial);
 
@@ -86,8 +96,23 @@ describe("usage ledger retention v2", () => {
     expect(prepared.changed).toBe(true);
     if (!prepared.changed) throw new Error("expected compaction");
     const retained = readFileSync(prepared.tempPath, "utf8");
+    expect(retained).toBe(complete);
     expect(retained.endsWith("\n")).toBe(true);
     expect(retained).not.toContain("partial");
+  });
+
+  test("retains the row when the byte ceiling lands exactly on its start boundary", () => {
+    const dir = home();
+    const path = join(dir, "usage.jsonl");
+    const old = `${JSON.stringify({ requestId: "old" })}\n`;
+    const newest = jsonlRowOfSize("new", MIN_USAGE_LEDGER_MAX_BYTES, "b");
+    writeFileSync(path, old + newest);
+
+    const prepared = prepareUsageLedgerCompaction(path, MIN_USAGE_LEDGER_MAX_BYTES);
+    expect(prepared.changed).toBe(true);
+    if (!prepared.changed) throw new Error("expected compaction");
+    expect(prepared.afterBytes).toBe(MIN_USAGE_LEDGER_MAX_BYTES);
+    expect(readFileSync(prepared.tempPath, "utf8")).toBe(newest);
   });
 
   test("never starts the candidate in the middle of a long row", () => {
@@ -103,6 +128,19 @@ describe("usage ledger retention v2", () => {
     const retained = readFileSync(prepared.tempPath, "utf8");
     expect(retained).toBe(second);
     expect(() => JSON.parse(retained.trim())).not.toThrow();
+  });
+
+  test("uses a parent-owned candidate path when one is supplied", () => {
+    const dir = home();
+    const path = join(dir, "usage.jsonl");
+    const tempPath = join(dir, "owned-retention.tmp");
+    writeFileSync(path, jsonlRowOfSize("old", MIN_USAGE_LEDGER_MAX_BYTES) + `${JSON.stringify({ requestId: "new" })}\n`);
+
+    const prepared = prepareUsageLedgerCompaction(path, MIN_USAGE_LEDGER_MAX_BYTES, tempPath);
+    expect(prepared.changed).toBe(true);
+    if (!prepared.changed) throw new Error("expected compaction");
+    expect(prepared.tempPath).toBe(tempPath);
+    expect(existsSync(tempPath)).toBe(true);
   });
 
   test("revision comparator detects a source mutation before commit", () => {
