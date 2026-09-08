@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -9,6 +9,8 @@ import {
   prepareUsageLedgerCompaction,
   usageLedgerRevisionMatches,
 } from "../src/usage/ledger-retention";
+import { parseUsageLedgerRetentionInput } from "../src/usage/ledger-retention-config";
+import { commitPreparedUsageLedgerCompaction } from "../src/usage/ledger-retention-job";
 
 const homes: string[] = [];
 
@@ -23,11 +25,29 @@ afterEach(() => {
 });
 
 describe("usage ledger retention v2", () => {
-  test("unknown config keys disable destructive retention", () => {
+  test("unknown persisted config keys disable destructive retention", () => {
     expect(normalizeUsageLedgerRetention({ enabled: true, maxByets: 8 * 1024 * 1024 })).toEqual({
       enabled: false,
       maxBytes: DEFAULT_USAGE_LEDGER_MAX_BYTES,
     });
+  });
+
+  test("live writes reject unknown config keys instead of silently stripping them", () => {
+    const parsed = parseUsageLedgerRetentionInput(
+      { enabled: true, maxByets: 8 * 1024 * 1024 },
+      { enabled: false, maxBytes: DEFAULT_USAGE_LEDGER_MAX_BYTES },
+    );
+    expect(parsed.ok).toBe(false);
+    if (parsed.ok) throw new Error("expected strict parser failure");
+    expect(parsed.error).toContain("maxByets");
+  });
+
+  test("partial live writes preserve the previous enabled state", () => {
+    const maxBytes = 8 * 1024 * 1024;
+    expect(parseUsageLedgerRetentionInput(
+      { maxBytes },
+      { enabled: true, maxBytes: DEFAULT_USAGE_LEDGER_MAX_BYTES },
+    )).toEqual({ ok: true, policy: { enabled: true, maxBytes } });
   });
 
   test("unsafe or below-floor byte limits disable destructive retention", () => {
@@ -89,5 +109,62 @@ describe("usage ledger retention v2", () => {
     const revision = { dev: 1, ino: 2, size: 3, mtimeMs: 4, ctimeMs: 5 };
     expect(usageLedgerRevisionMatches(revision, revision)).toBe(true);
     expect(usageLedgerRevisionMatches(revision, { ...revision, size: 4 })).toBe(false);
+  });
+
+  test("defers commit while a request turn is active and discards the candidate", () => {
+    const dir = home();
+    const path = join(dir, "usage.jsonl");
+    const old = `${JSON.stringify({ requestId: "old", filler: "a".repeat(MIN_USAGE_LEDGER_MAX_BYTES) })}\n`;
+    const latest = `${JSON.stringify({ requestId: "new" })}\n`;
+    writeFileSync(path, old + latest);
+    const prepared = prepareUsageLedgerCompaction(path, MIN_USAGE_LEDGER_MAX_BYTES);
+    if (!prepared.changed) throw new Error("expected compaction");
+
+    const result = commitPreparedUsageLedgerCompaction(prepared, { activeTurnCount: () => 1 });
+    expect(result.deferred).toBe("active_turns");
+    expect(existsSync(prepared.tempPath)).toBe(false);
+    expect(readFileSync(path, "utf8")).toBe(old + latest);
+  });
+
+  test("does not overwrite an append that landed after Worker preparation", () => {
+    const dir = home();
+    const path = join(dir, "usage.jsonl");
+    const old = `${JSON.stringify({ requestId: "old", filler: "a".repeat(MIN_USAGE_LEDGER_MAX_BYTES) })}\n`;
+    const latest = `${JSON.stringify({ requestId: "new" })}\n`;
+    writeFileSync(path, old + latest);
+    const prepared = prepareUsageLedgerCompaction(path, MIN_USAGE_LEDGER_MAX_BYTES);
+    if (!prepared.changed) throw new Error("expected compaction");
+
+    const appended = `${JSON.stringify({ requestId: "after-prepare" })}\n`;
+    appendFileSync(path, appended);
+    const result = commitPreparedUsageLedgerCompaction(prepared, { activeTurnCount: () => 0 });
+    expect(result.deferred).toBe("source_changed");
+    expect(existsSync(prepared.tempPath)).toBe(false);
+    expect(readFileSync(path, "utf8")).toBe(old + latest + appended);
+  });
+
+  test("closes the derived history index before replacing an unchanged ledger", () => {
+    const dir = home();
+    const path = join(dir, "usage.jsonl");
+    const old = `${JSON.stringify({ requestId: "old", filler: "a".repeat(MIN_USAGE_LEDGER_MAX_BYTES) })}\n`;
+    const latest = `${JSON.stringify({ requestId: "new" })}\n`;
+    writeFileSync(path, old + latest);
+    const prepared = prepareUsageLedgerCompaction(path, MIN_USAGE_LEDGER_MAX_BYTES);
+    if (!prepared.changed) throw new Error("expected compaction");
+    const expected = readFileSync(prepared.tempPath, "utf8");
+    let closed = false;
+
+    const result = commitPreparedUsageLedgerCompaction(prepared, {
+      activeTurnCount: () => 0,
+      closeHistoryIndex: () => { closed = true; },
+      rename: (from, to) => {
+        expect(closed).toBe(true);
+        const { renameSync } = require("node:fs") as typeof import("node:fs");
+        renameSync(from, to);
+      },
+    });
+    expect(result.ok).toBe(true);
+    expect(result.droppedBytes).toBeGreaterThan(0);
+    expect(readFileSync(path, "utf8")).toBe(expected);
   });
 });
