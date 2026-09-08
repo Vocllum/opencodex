@@ -166,7 +166,7 @@ export function CodexAccountPoolCards({
             >
               <summary className="btn btn-ghost btn-sm" aria-label={`${t("codexAuth.moreActions")} — ${a.email}`} title={t("codexAuth.moreActions")}>⋯</summary>
               <div className="codex-account-more-body">
-                {!hasCustomPriority && priorityControl}
+                {!hasCustomPriority && moreOpen.has(a.id) && priorityControl}
                 <span className="mono text-caption muted">{t("prov.accountId")}: {displayAccountId(a.id)}</span>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => idCopy.copy(a.id, a.id)}>
                   {idCopy.outcomeFor(a.id) === "copied" ? t("startup.copied") : t("codexAuth.copyId")}
