@@ -55,10 +55,12 @@ let lastWarningAt = 0;
 const WARNING_INTERVAL_MS = 60_000;
 const WORKER_TIMEOUT_MS = 10 * 60 * 1000;
 
+/** Remove a Worker candidate without surfacing path-bearing filesystem errors. */
 function discardCandidate(path: string, unlink: typeof unlinkSync = unlinkSync): void {
   try { unlink(path); } catch { /* already absent / best effort */ }
 }
 
+/** Emit at most one fixed, path-free retention warning per minute. */
 function warnRetentionFailure(): void {
   const now = Date.now();
   if (now - lastWarningAt < WARNING_INTERVAL_MS) return;
@@ -148,6 +150,7 @@ export function commitPreparedUsageLedgerCompaction(
   }
 }
 
+/** Return a detached snapshot of the process-local retention controller state. */
 export function getUsageLedgerRetentionJobState(): UsageLedgerRetentionJobState {
   return {
     ...state,
@@ -155,9 +158,16 @@ export function getUsageLedgerRetentionJobState(): UsageLedgerRetentionJobState 
   };
 }
 
+/** Allocate the candidate name in the parent before the Worker can create it. */
+function retentionCandidatePath(path: string): string {
+  return `${path}.retention-${process.pid}-${crypto.randomUUID()}.tmp`;
+}
+
+/** Run the expensive scan/copy phase in the shared, admission-controlled Worker lane. */
 function runInWorker(path: string, maxBytes: number): Promise<UsageLedgerCompactionPreparation> {
   const reservation = tryReserveStorageWorker();
   if (!reservation) return Promise.reject(new StorageWorkerAdmissionBusyError());
+  const tempPath = retentionCandidatePath(path);
 
   return withStorageWorkerSpawnGate(() => new Promise<UsageLedgerCompactionPreparation>((resolve, reject) => {
     const requestId = crypto.randomUUID();
@@ -173,21 +183,25 @@ function runInWorker(path: string, maxBytes: number): Promise<UsageLedgerCompact
     }
     activeWorker = worker;
 
-    const finish = (fn: () => void) => {
+    const finish = (fn: () => void, cleanupCandidate = false) => {
       if (settled) return;
       settled = true;
       cancelActiveRun = null;
       clearTimeout(timer);
       if (activeWorker === worker) activeWorker = null;
-      void terminateStorageWorker(worker).then(fn, fn);
+      const afterTerminate = () => {
+        if (cleanupCandidate) discardCandidate(tempPath);
+        fn();
+      };
+      void terminateStorageWorker(worker).then(afterTerminate, afterTerminate);
     };
 
     const timer = setTimeout(() => {
-      finish(() => reject(new Error("usage_ledger_retention_worker_timeout")));
+      finish(() => reject(new Error("usage_ledger_retention_worker_timeout")), true);
     }, WORKER_TIMEOUT_MS);
 
     cancelActiveRun = () => {
-      finish(() => reject(new Error("aborted")));
+      finish(() => reject(new Error("aborted")), true);
     };
 
     worker.onmessage = (event: MessageEvent<unknown>) => {
@@ -200,17 +214,18 @@ function runInWorker(path: string, maxBytes: number): Promise<UsageLedgerCompact
         return;
       }
       if (message.type === "error") {
-        finish(() => reject(new Error("usage_ledger_retention_worker_failed")));
+        finish(() => reject(new Error("usage_ledger_retention_worker_failed")), true);
       }
     };
     worker.onerror = () => {
-      finish(() => reject(new Error("usage_ledger_retention_worker_failed")));
+      finish(() => reject(new Error("usage_ledger_retention_worker_failed")), true);
     };
 
     worker.postMessage({
       type: "run",
       requestId,
       path,
+      tempPath,
       maxBytes,
       env: {
         ...(process.env.OPENCODEX_HOME ? { OPENCODEX_HOME: process.env.OPENCODEX_HOME } : {}),
@@ -218,10 +233,12 @@ function runInWorker(path: string, maxBytes: number): Promise<UsageLedgerCompact
     });
   })).catch(error => {
     reservation.release();
+    discardCandidate(tempPath);
     throw error;
   });
 }
 
+/** Execute one policy snapshot and discard its candidate if that snapshot becomes stale. */
 async function executeJob(generation: number): Promise<void> {
   const policy = readUsageLedgerRetentionFromConfig();
   if (!policy.enabled) {
@@ -277,6 +294,16 @@ async function executeJob(generation: number): Promise<void> {
   }
 }
 
+/**
+ * Invalidate the policy snapshot owned by any current run.
+ *
+ * Policy PUTs call this after persisting/applying the new settings. The old Worker
+ * may finish its read-only preparation, but its generation can no longer commit.
+ */
+export function invalidateUsageLedgerRetentionRun(): void {
+  runGeneration += 1;
+}
+
 /** Start one asynchronous retention evaluation. */
 export function requestUsageLedgerRetentionRun():
   | { accepted: true; state: UsageLedgerRetentionJobState }
@@ -293,7 +320,16 @@ export function requestUsageLedgerRetentionRun():
   const job = executeJob(generation);
   inflight = job;
   void job.finally(() => {
-    if (inflight === job) inflight = null;
+    if (inflight !== job) return;
+    inflight = null;
+    if (generation !== runGeneration && state.status === "running") {
+      state = {
+        status: "idle",
+        startedAt: state.startedAt,
+        finishedAt: Date.now(),
+        ...(state.lastOutcome ? { lastOutcome: state.lastOutcome } : {}),
+      };
+    }
   });
   return { accepted: true, state: getUsageLedgerRetentionJobState() };
 }
