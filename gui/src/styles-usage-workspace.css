@@ -248,7 +248,7 @@
   gap: var(--space-3);
 }
 
-.usage-retention-limit {
+.usage-retention-editor .usage-retention-limit {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
@@ -256,7 +256,7 @@
   margin: 0;
 }
 
-.usage-retention-limit .field-label {
+.usage-retention-editor .usage-retention-limit .field-label {
   white-space: nowrap;
 }
 
