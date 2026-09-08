@@ -84,11 +84,12 @@ export default function UsageLedgerRetentionControl({ apiBase }: { apiBase: stri
   const limitMiB = status ? limitMiBFromBytes(status.maxBytes) : null;
   const enabled = status?.enabled === true;
   // Until GET resolves (and whenever the policy is off), the visible value is
-  // explicitly Unlimited. This avoids inventing a 512 MiB default in the UI.
-  const selectedValue = !enabled
-    ? UNLIMITED_OPTION
-    : customOpen
-      ? CUSTOM_OPTION
+  // explicitly Unlimited. The only exception is an explicitly opened Custom
+  // draft, which mirrors the native Models control until the user applies it.
+  const selectedValue = customOpen
+    ? CUSTOM_OPTION
+    : !enabled
+      ? UNLIMITED_OPTION
       : limitMiB === null
         ? CUSTOM_OPTION
         : String(limitMiB);

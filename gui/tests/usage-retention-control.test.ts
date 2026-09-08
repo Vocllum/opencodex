@@ -9,7 +9,8 @@ test("Usage retention control stays a small native-control surface", async () =>
   expect(storageWorkspace).not.toContain("UsageLedgerRetentionPanel");
   expect(component).toContain("<Switch");
   expect(component).toContain("<Select");
-  expect(component).toContain("const selectedValue = !enabled");
+  expect(component).toContain("const selectedValue = customOpen");
+  expect(component).toContain("? UNLIMITED_OPTION");
   expect(component).toContain('const UNLIMITED_OPTION = "unlimited"');
   expect(component).not.toContain("useState(512");
   expect(component).toContain("models.custom");
