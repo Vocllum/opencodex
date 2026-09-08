@@ -141,11 +141,12 @@ export async function handleStorageLogGuardRoutes(ctx: ManagementContext): Promi
       try {
         const saved = writeUsageLedgerRetentionToConfig(parsed.policy);
         applyUsageLedgerRetentionToLiveConfig(config, saved);
-        const run = saved.enabled ? requestUsageLedgerRetentionRun() : null;
+        // PUT changes policy only. Automatic enforcement belongs to the scheduler;
+        // the explicit /run route is the operator's immediate destructive action.
         return jsonResponse({
           ok: true,
           ...getUsageLedgerRetentionStatus(config),
-          job: run?.state ?? getUsageLedgerRetentionJobState(),
+          job: getUsageLedgerRetentionJobState(),
         }, 200, req, config);
       } catch {
         return jsonResponse({ error: "config_write_failed" }, 500, req, config);
