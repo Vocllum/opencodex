@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { formatBytes } from "../../format-bytes";
 import { useI18n } from "../../i18n/shared";
 import { Switch } from "../../ui";
@@ -37,12 +37,14 @@ export default function UsageLedgerRetentionControl({ apiBase }: { apiBase: stri
   const [status, setStatus] = useState<RetentionStatus | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const loadGeneration = useRef(0);
 
   const load = useCallback(async (signal?: AbortSignal) => {
+    const generation = ++loadGeneration.current;
     const response = await fetch(`${apiBase}/api/storage/usage-ledger-retention`, { signal });
     if (!response.ok) throw new Error("load_failed");
     const next = parseStatus(await response.json());
-    if (signal?.aborted) return;
+    if (signal?.aborted || generation !== loadGeneration.current) return;
     setStatus(next);
   }, [apiBase]);
 
@@ -71,7 +73,11 @@ export default function UsageLedgerRetentionControl({ apiBase }: { apiBase: stri
         body: JSON.stringify({ enabled: nextEnabled, maxBytes }),
       });
       if (!response.ok) throw new Error("save_failed");
-      setStatus(parseStatus(await response.json()));
+      const next = parseStatus(await response.json());
+      // A GET may have started before this authoritative mutation completed (for example,
+      // after a locale change). Do not let that older snapshot repaint the saved state.
+      loadGeneration.current += 1;
+      setStatus(next);
     } catch {
       setError(t("usage.retention.error"));
     } finally {
@@ -101,7 +107,15 @@ export default function UsageLedgerRetentionControl({ apiBase }: { apiBase: stri
 
       <p className="muted text-caption usage-retention-current">
         {t("usage.retention.current")}: {status?.currentBytes === undefined ? "—" : formatBytes(status.currentBytes, locale)}
-        {status ? ` · ${t("usage.retention.limit")}: ${formatBytes(status.maxBytes, locale)}` : ""}
+        {status && (
+          <>
+            {" · "}
+            {!status.enabled && <><span className="usage-retention-state">{t("usage.retention.unlimited")}</span>{" · "}</>}
+            <span className={`usage-retention-limit${status.enabled ? "" : " is-disabled"}`}>
+              {t("usage.retention.limit")}: {formatBytes(status.maxBytes, locale)}
+            </span>
+          </>
+        )}
       </p>
       {error && <p className="err" role="alert">{error}</p>}
     </section>
