@@ -75,6 +75,9 @@ export default function UsageLedgerRetentionPanel({
     () => Math.max(1, Math.floor(Number.isFinite(limitMiB) ? limitMiB : 1)),
     [limitMiB],
   );
+  const hasUnsavedChanges = status !== null && (
+    enabled !== status.enabled || normalizedLimitMiB * MIB !== status.maxBytes
+  );
 
   /** Persist policy only; destructive work remains behind scheduler or explicit run. */
   const save = async () => {
@@ -105,6 +108,7 @@ export default function UsageLedgerRetentionPanel({
 
   /** Request the explicit immediate destructive run, then refresh its job state. */
   const applyNow = async () => {
+    if (hasUnsavedChanges) return;
     setBusyAction("apply");
     setError(null);
     setMessage(null);
@@ -181,7 +185,7 @@ export default function UsageLedgerRetentionPanel({
         <button
           type="button"
           className="btn btn-ghost btn-sm"
-          disabled={busy || !status?.enabled || jobRunning}
+          disabled={busy || !status?.enabled || jobRunning || hasUnsavedChanges}
           onClick={() => void applyNow()}
         >
           {busyAction === "apply" || jobRunning
@@ -190,6 +194,7 @@ export default function UsageLedgerRetentionPanel({
         </button>
       </div>
 
+      {hasUnsavedChanges && <p className="stw-hint">{t("storage.usageRetention.saveBeforeApply")}</p>}
       {status && !status.enabled && <p className="stw-hint">{t("storage.usageRetention.disabled")}</p>}
       {message && <p className="stw-hint" role="status">{message}</p>}
       {error && <p className="err" role="alert">{error}</p>}
