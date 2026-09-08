@@ -10,7 +10,7 @@ import {
   writeSync,
 } from "node:fs";
 
-export const DEFAULT_USAGE_LEDGER_MAX_BYTES = 512 * 1024 * 1024;
+export const DEFAULT_USAGE_LEDGER_MAX_BYTES = 1024 * 1024 * 1024;
 export const MIN_USAGE_LEDGER_MAX_BYTES = 1024 * 1024;
 const SCAN_CHUNK_BYTES = 1024 * 1024;
 
