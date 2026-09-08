@@ -1,4 +1,5 @@
-import { chmodSync, statSync, renameSync, unlinkSync } from "node:fs";
+import { chmodSync, statSync, unlinkSync } from "node:fs";
+import { renameAtomicFile } from "../lib/windows-atomic-replace";
 import { closeRequestHistoryIndex } from "../routing/history/indexer";
 import { getActiveTurnCount } from "../server/lifecycle";
 import {
@@ -40,7 +41,7 @@ export interface UsageLedgerRetentionCommitDeps {
   activeTurnCount?: () => number;
   closeHistoryIndex?: () => void;
   stat?: typeof statSync;
-  rename?: typeof renameSync;
+  rename?: (source: string, destination: string) => void;
   chmod?: typeof chmodSync;
   unlink?: typeof unlinkSync;
 }
@@ -78,7 +79,12 @@ export function commitPreparedUsageLedgerCompaction(
   const activeTurnCount = deps.activeTurnCount ?? getActiveTurnCount;
   const closeHistoryIndex = deps.closeHistoryIndex ?? closeRequestHistoryIndex;
   const stat = deps.stat ?? statSync;
-  const rename = deps.rename ?? renameSync;
+  // Keep the final publication synchronous. The shared helper retries the short
+  // Windows sharing-violation window with sleepSync, so no request callback can
+  // interleave after the revision check and publish a newer append underneath us.
+  const rename = deps.rename ?? ((source: string, destination: string) => {
+    renameAtomicFile(source, destination, undefined, "usage-retention");
+  });
   const chmod = deps.chmod ?? chmodSync;
   const unlink = deps.unlink ?? unlinkSync;
 
