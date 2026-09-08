@@ -171,6 +171,52 @@ test("a stale GET cannot repaint policy after a successful toggle", async () => 
   expect(toggle.getAttribute("aria-pressed")).toBe("true");
 });
 
+test("a stale failed GET is silent after a successful toggle", async () => {
+  const apiBase = "http://usage-retention-stale-failure";
+  const maxBytes = 1024 * 1024 * 1024;
+  let getCount = 0;
+  let resolveStaleGet: ((response: Response) => void) | undefined;
+
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url !== `${apiBase}/api/storage/usage-ledger-retention`) throw new Error(`unexpected fetch: ${url}`);
+    if ((init?.method ?? "GET") === "PUT") {
+      return Promise.resolve(Response.json({ enabled: true, maxBytes, currentBytes: 1234 }));
+    }
+    getCount += 1;
+    if (getCount === 1) return Promise.resolve(Response.json({ enabled: false, maxBytes, currentBytes: 1234 }));
+    return new Promise<Response>(resolve => { resolveStaleGet = resolve; });
+  }) as typeof fetch;
+
+  await act(async () => {
+    root = createRoot(host);
+    root.render(createElement(LanguageProvider, null, createElement(LocaleHarness, { apiBase })));
+  });
+  await settleTimers();
+
+  const localeSwitch = host.querySelector<HTMLButtonElement>("#locale-switch");
+  if (!localeSwitch) throw new Error("locale switch missing");
+  await act(async () => { localeSwitch.click(); });
+  await settleTimers();
+  expect(getCount).toBe(2);
+
+  const toggle = host.querySelector<HTMLButtonElement>("button.switch");
+  if (!toggle) throw new Error("retention switch missing");
+  await act(async () => {
+    toggle.click();
+    await Promise.resolve();
+  });
+  expect(toggle.getAttribute("aria-pressed")).toBe("true");
+
+  if (!resolveStaleGet) throw new Error("stale GET was not started");
+  await act(async () => {
+    resolveStaleGet(new Response("", { status: 500 }));
+    await Promise.resolve();
+  });
+  expect(toggle.getAttribute("aria-pressed")).toBe("true");
+  expect(host.querySelector('[role="alert"]')).toBeNull();
+});
+
 test("failed toggle keeps the last server state and surfaces an error", async () => {
   const apiBase = "http://usage-retention-failure";
   const maxBytes = 256 * 1024 * 1024;
