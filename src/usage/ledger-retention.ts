@@ -115,6 +115,7 @@ export function usageLedgerRevisionMatches(
     && left.ctimeMs === right.ctimeMs;
 }
 
+/** Find the final complete-line delimiter before `endExclusive`. */
 function findLastNewline(fd: number, endExclusive: number): number {
   const buffer = Buffer.allocUnsafe(SCAN_CHUNK_BYTES);
   let end = endExclusive;
@@ -130,6 +131,7 @@ function findLastNewline(fd: number, endExclusive: number): number {
   return -1;
 }
 
+/** Find the next complete-line delimiter at or after `startInclusive`. */
 function findFirstNewline(fd: number, startInclusive: number, endExclusive: number): number {
   const buffer = Buffer.allocUnsafe(SCAN_CHUNK_BYTES);
   let start = startInclusive;
@@ -145,6 +147,7 @@ function findFirstNewline(fd: number, startInclusive: number, endExclusive: numb
   return -1;
 }
 
+/** Copy an exact byte range while tolerating short reads/writes. */
 function copyRange(sourceFd: number, targetFd: number, start: number, endExclusive: number): number {
   const buffer = Buffer.allocUnsafe(SCAN_CHUNK_BYTES);
   let offset = start;
@@ -170,10 +173,15 @@ function copyRange(sourceFd: number, targetFd: number, start: number, endExclusi
  * probe ceiling, so a single row larger than the copy chunk cannot leak a
  * partial prefix. The backward scan drops an unterminated crash tail. If one
  * complete row itself exceeds maxBytes it is dropped, preserving the hard cap.
+ *
+ * `candidatePath` lets the parent process own the temporary path before a Worker
+ * starts. That ownership is required so timeout/shutdown can remove a candidate
+ * even when the Worker produced it but its completion message was never claimed.
  */
 export function prepareUsageLedgerCompaction(
   path: string,
   maxBytes: number,
+  candidatePath?: string,
 ): UsageLedgerCompactionPreparation {
   if (!Number.isSafeInteger(maxBytes) || maxBytes < MIN_USAGE_LEDGER_MAX_BYTES) {
     throw new RangeError(`maxBytes must be a safe integer >= ${MIN_USAGE_LEDGER_MAX_BYTES}`);
@@ -204,11 +212,19 @@ export function prepareUsageLedgerCompaction(
     const desiredStart = Math.max(0, completeEnd - maxBytes);
     let retainedStart = 0;
     if (desiredStart > 0) {
-      const newline = findFirstNewline(sourceFd, desiredStart, completeEnd);
-      retainedStart = newline < 0 ? completeEnd : newline + 1;
+      const previousByte = Buffer.allocUnsafe(1);
+      const startsAtRowBoundary =
+        readSync(sourceFd, previousByte, 0, 1, desiredStart - 1) === 1
+        && previousByte[0] === 0x0a;
+      if (startsAtRowBoundary) {
+        retainedStart = desiredStart;
+      } else {
+        const newline = findFirstNewline(sourceFd, desiredStart, completeEnd);
+        retainedStart = newline < 0 ? completeEnd : newline + 1;
+      }
     }
 
-    tempPath = `${path}.retention-${process.pid}-${crypto.randomUUID()}.tmp`;
+    tempPath = candidatePath ?? `${path}.retention-${process.pid}-${crypto.randomUUID()}.tmp`;
     const targetFd = openSync(tempPath, "wx", 0o600);
     let afterBytes = 0;
     try {
