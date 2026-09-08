@@ -64,7 +64,8 @@ async function waitForRetentionIdle(timeoutMs = 10_000): Promise<void> {
 }
 
 describe("usage ledger retention v2", () => {
-  test("unknown persisted config keys disable destructive retention", () => {
+  test("missing or unknown persisted config keys stay Unlimited", () => {
+    expect(normalizeUsageLedgerRetention(undefined).enabled).toBe(false);
     expect(normalizeUsageLedgerRetention({ enabled: true, maxByets: 8 * 1024 * 1024 })).toEqual({
       enabled: false,
       maxBytes: DEFAULT_USAGE_LEDGER_MAX_BYTES,
