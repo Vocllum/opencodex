@@ -33,10 +33,12 @@ function unlinkDerivedFile(path: string): boolean {
  * would detect that identity change on its next query and rebuild automatically, but deleting
  * the old projection here reclaims its disk immediately even when no later history query occurs.
  * Failure is non-fatal: the next index open still validates source identity and recreates it.
+ *
+ * `configDir` is injectable so isolated retention tests never touch the process' real config home.
  */
-export function discardRequestHistoryProjection(): boolean {
+export function discardRequestHistoryProjection(configDir = getConfigDir()): boolean {
   closeRequestHistoryIndex();
-  const path = historyIndexPath(getConfigDir());
+  const path = historyIndexPath(configDir);
   const wal = unlinkDerivedFile(`${path}-wal`);
   const shm = unlinkDerivedFile(`${path}-shm`);
   const main = unlinkDerivedFile(path);
