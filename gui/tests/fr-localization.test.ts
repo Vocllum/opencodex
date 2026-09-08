@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test";
 import { formatResetFuture } from "../src/components/QuotaBars";
 import { formatUptime } from "../src/formatUptime";
 import type { TKey } from "../src/i18n";
-import { en, type TKey as BaseTKey } from "../src/i18n/en";
 import { DICTS, LOCALES } from "../src/i18n/shared";
 import { labSupplement } from "../src/i18n/lab-translations";
 import { ROUTING_COMPATIBILITY_FIELD_LABELS } from "../src/i18n/routing-compatibility-labels";
@@ -190,10 +189,10 @@ describe("French base catalog", () => {
     if (!(await Bun.file(FR_CATALOG_URL).exists())) return;
 
     const french = (await import("../src/i18n/fr")).fr;
-    const english = en;
+    const english = DICTS.en;
 
     expect(Object.keys(french).sort()).toEqual(Object.keys(english).sort());
-    for (const key of Object.keys(english) as BaseTKey[]) {
+    for (const key of Object.keys(english) as TKey[]) {
       expect(french[key].trim().length, key).toBeGreaterThan(0);
       expect(placeholders(french[key]), key).toEqual(placeholders(english[key]));
     }
@@ -204,7 +203,7 @@ describe("French base catalog", () => {
     if (!(await Bun.file(FR_CATALOG_URL).exists())) return;
 
     const french = (await import("../src/i18n/fr")).fr;
-    const accidental = (Object.keys(en) as BaseTKey[]).filter(key =>
+    const accidental = (Object.keys(DICTS.en) as TKey[]).filter(key =>
       french[key] === DICTS.en[key] && !INTENTIONAL_ENGLISH.has(key)
     );
 
