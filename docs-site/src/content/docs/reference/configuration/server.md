@@ -237,10 +237,12 @@ the file exceeds the configured limit; normal request handling is not blocked by
 }
 ```
 
-The default is **Unlimited** (`enabled: false`). To enable a ceiling, set `enabled: true` together
-with `maxBytes`; it must be a safe integer of at least 1 MiB (`1048576`). A saved ceiling is
-retained when `enabled` is set to `false`, so an operator can pause retention without losing the
-selected limit. Unknown keys and malformed values fail closed and leave retention disabled.
+The effective default is **Unlimited** (`enabled: false`). An unconfigured installation remembers
+**1 GiB** (`1073741824`) as `maxBytes`; that saved value becomes effective on first enable. Set
+`maxBytes` explicitly only when selecting a different ceiling. Any explicit value must be a safe
+integer of at least 1 MiB (`1048576`). A saved ceiling is retained when `enabled` is set to `false`,
+so an operator can pause retention without losing the selected limit. Unknown keys and malformed
+values fail closed and leave retention disabled.
 
 Compaction publishes a complete JSONL-row candidate only after the source revision and active-turn
 checks still match. An unterminated crash tail is discarded; a single row larger than the ceiling
