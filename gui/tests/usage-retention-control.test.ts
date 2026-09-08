@@ -246,9 +246,15 @@ test("shows a custom MiB editor only when enabled and saves the edited ceiling",
   const increment = input.parentElement?.querySelector<HTMLButtonElement>(".ocx-stepper__btn");
   if (!increment) throw new Error("retention stepper missing");
   await act(async () => { increment.click(); });
-  await act(async () => { input.focus(); });
+  expect(testWindow.document.activeElement).toBe(input);
+  expect(input.value).toBe("769");
+  expect(writes).toEqual([]);
+
+  const outside = testWindow.document.createElement("button") as never as HTMLButtonElement;
+  outside.type = "button";
+  host.appendChild(outside as never);
   await act(async () => {
-    input.dispatchEvent(new testWindow.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    outside.focus();
     await Promise.resolve();
   });
   expect(writes).toEqual([{ enabled: true, maxBytes: 769 * 1024 * 1024 }]);
