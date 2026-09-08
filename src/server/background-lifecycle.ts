@@ -53,11 +53,13 @@ const owners: LeaseOwner[] = [];
 let processLoops: ProcessLoops | null = null;
 let cleanupInProgress = false;
 
+/** Route cleanup-policy state updates to the newest live server owner, or detach the sink. */
 function setLivePolicyOwner(applyPolicy: PolicyApply | null): void {
   setStorageCleanupPolicyLiveSink(applyPolicy);
   setStorageCleanupPolicyJobLiveApply(applyPolicy);
 }
 
+/** Start the process-wide watchdogs, sweepers, schedulers, and optional quota background hooks. */
 function startProcessLoops(applyPolicy: PolicyApply): ProcessLoops {
   let memoryWatchdog: MemoryWatchdog | null = null;
   let stateStoreSweeper: ReturnType<typeof startStateStoreSweeper> | null = null;
@@ -98,6 +100,7 @@ function startProcessLoops(applyPolicy: PolicyApply): ProcessLoops {
   }
 }
 
+/** Stop process-wide timer loops and detach the current live-policy sink. */
 function stopProcessLoops(): void {
   const loops = processLoops;
   processLoops = null;
@@ -109,6 +112,7 @@ function stopProcessLoops(): void {
   setLivePolicyOwner(null);
 }
 
+/** Cancel both storage Worker controllers, then join every shared storage Worker before exit. */
 async function stopStoragePolicyWorker(): Promise<void> {
   cancelQueuedStorageWorkerSpawns();
   const abortResult = await Promise.allSettled([
@@ -132,6 +136,7 @@ async function stopStoragePolicyWorker(): Promise<void> {
   }
 }
 
+/** Remove one lifecycle owner by token and report whether it was still active. */
 function removeOwner(owner: LeaseOwner): boolean {
   const index = owners.findIndex(candidate => candidate.token === owner.token);
   if (index === -1) return false;
@@ -139,6 +144,7 @@ function removeOwner(owner: LeaseOwner): boolean {
   return true;
 }
 
+/** Release one owner synchronously and classify whether shared process resources remain. */
 function releaseOwnerSynchronously(owner: LeaseOwner): "inactive" | "shared" | "last" {
   if (!removeOwner(owner)) return "inactive";
   owner.resources.release();
