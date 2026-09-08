@@ -58,16 +58,17 @@ export default function UsageLedgerRetentionPanel({
 
   useEffect(() => {
     const controller = new AbortController();
-    // `load` awaits the management API before committing its snapshot, so this
-    // is an external subscription update rather than a synchronous render
-    // cascade. Keep the initial fetch in the effect to preserve cancellation.
-    // eslint-disable-next-line react-hooks/set-state-in-effect, react/react-compiler
-    void load(controller.signal).catch(errorValue => {
-      if ((errorValue as { name?: string })?.name !== "AbortError") {
-        setError(t("storage.usageRetention.error"));
-      }
-    });
-    return () => controller.abort();
+    const timeout = window.setTimeout(() => {
+      void load(controller.signal).catch(errorValue => {
+        if ((errorValue as { name?: string })?.name !== "AbortError") {
+          setError(t("storage.usageRetention.error"));
+        }
+      });
+    }, 0);
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
   }, [load, t]);
 
   useEffect(() => {
