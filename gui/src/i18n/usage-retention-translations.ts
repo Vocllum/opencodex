@@ -11,6 +11,7 @@ export type UsageRetentionCatalogKey =
   | "storage.usageRetention.saving"
   | "storage.usageRetention.running"
   | "storage.usageRetention.saved"
+  | "storage.usageRetention.saveBeforeApply"
   | "storage.usageRetention.disabled"
   | "storage.usageRetention.error";
 
@@ -25,6 +26,7 @@ const en: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.saving": "Saving…",
   "storage.usageRetention.running": "Applying…",
   "storage.usageRetention.saved": "Saved",
+  "storage.usageRetention.saveBeforeApply": "Save these changes before applying the limit now.",
   "storage.usageRetention.disabled": "Disabled",
   "storage.usageRetention.error": "Could not update the usage history limit.",
 };
@@ -40,6 +42,7 @@ const de: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.saving": "Wird gespeichert…",
   "storage.usageRetention.running": "Wird angewendet…",
   "storage.usageRetention.saved": "Gespeichert",
+  "storage.usageRetention.saveBeforeApply": "Speichern Sie diese Änderungen, bevor Sie das Limit sofort anwenden.",
   "storage.usageRetention.disabled": "Deaktiviert",
   "storage.usageRetention.error": "Das Größenlimit für den Nutzungsverlauf konnte nicht aktualisiert werden.",
 };
@@ -55,6 +58,7 @@ const fr: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.saving": "Enregistrement…",
   "storage.usageRetention.running": "Application…",
   "storage.usageRetention.saved": "Enregistré",
+  "storage.usageRetention.saveBeforeApply": "Enregistrez ces modifications avant d’appliquer la limite maintenant.",
   "storage.usageRetention.disabled": "Désactivé",
   "storage.usageRetention.error": "Impossible de mettre à jour la limite de l’historique d’utilisation.",
 };
@@ -70,6 +74,7 @@ const ko: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.saving": "저장 중…",
   "storage.usageRetention.running": "적용 중…",
   "storage.usageRetention.saved": "저장됨",
+  "storage.usageRetention.saveBeforeApply": "지금 제한을 적용하기 전에 변경 사항을 저장하세요.",
   "storage.usageRetention.disabled": "비활성화됨",
   "storage.usageRetention.error": "사용 기록 크기 제한을 업데이트할 수 없습니다.",
 };
@@ -85,6 +90,7 @@ const zh: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.saving": "正在保存…",
   "storage.usageRetention.running": "正在应用…",
   "storage.usageRetention.saved": "已保存",
+  "storage.usageRetention.saveBeforeApply": "请先保存这些改动，再立即应用限制。",
   "storage.usageRetention.disabled": "已关闭",
   "storage.usageRetention.error": "无法更新 Usage 历史大小限制。",
 };
@@ -100,6 +106,7 @@ const zhTW: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.saving": "正在儲存…",
   "storage.usageRetention.running": "正在套用…",
   "storage.usageRetention.saved": "已儲存",
+  "storage.usageRetention.saveBeforeApply": "請先儲存這些變更，再立即套用限制。",
   "storage.usageRetention.disabled": "已關閉",
   "storage.usageRetention.error": "無法更新 Usage 歷史大小限制。",
 };
@@ -115,6 +122,7 @@ const ru: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.saving": "Сохранение…",
   "storage.usageRetention.running": "Применение…",
   "storage.usageRetention.saved": "Сохранено",
+  "storage.usageRetention.saveBeforeApply": "Сохраните изменения перед немедленным применением лимита.",
   "storage.usageRetention.disabled": "Отключено",
   "storage.usageRetention.error": "Не удалось обновить ограничение размера истории использования.",
 };
@@ -130,6 +138,7 @@ const ja: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.saving": "保存中…",
   "storage.usageRetention.running": "適用中…",
   "storage.usageRetention.saved": "保存しました",
+  "storage.usageRetention.saveBeforeApply": "今すぐ上限を適用する前に、この変更を保存してください。",
   "storage.usageRetention.disabled": "無効",
   "storage.usageRetention.error": "使用履歴のサイズ上限を更新できませんでした。",
 };
@@ -145,6 +154,7 @@ const tr: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.saving": "Kaydediliyor…",
   "storage.usageRetention.running": "Uygulanıyor…",
   "storage.usageRetention.saved": "Kaydedildi",
+  "storage.usageRetention.saveBeforeApply": "Sınırı şimdi uygulamadan önce bu değişiklikleri kaydedin.",
   "storage.usageRetention.disabled": "Devre dışı",
   "storage.usageRetention.error": "Kullanım geçmişi boyut sınırı güncellenemedi.",
 };
