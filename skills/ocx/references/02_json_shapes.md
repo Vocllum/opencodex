@@ -37,7 +37,7 @@ One row per line. The fields worth branching on:
 | Field | Meaning |
 |---|---|
 | `requestId` | pass to `ocx logs explain` |
-| `conversationId` | groups a conversation; also printed as `conv=<id>` |
+| `conversationId` | groups a conversation; also printed as `conv=<id>` in human output |
 | `provider` / `model` | what actually served it |
 | `requestedModel` / `requestedAlias` | what the client asked for |
 | `status` / `durationMs` | outcome |
