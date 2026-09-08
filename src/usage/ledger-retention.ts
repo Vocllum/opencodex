@@ -10,15 +10,17 @@ import {
   writeSync,
 } from "node:fs";
 
+import type { UsageLedgerRetentionConfig } from "../types/config";
+
 export const DEFAULT_USAGE_LEDGER_MAX_BYTES = 512 * 1024 * 1024;
 export const MIN_USAGE_LEDGER_MAX_BYTES = 1024 * 1024;
 const SCAN_CHUNK_BYTES = 1024 * 1024;
 
 /** Persisted, user-authored config. Every key is optional on disk. */
-export interface PersistedUsageLedgerRetention {
-  enabled?: boolean;
-  maxBytes?: number;
-}
+export type PersistedUsageLedgerRetention = UsageLedgerRetentionConfig;
+
+/** Compatibility alias for the first-class persisted OcxConfig section. */
+export type PersistedUsageLedgerRetentionConfig = UsageLedgerRetentionConfig;
 
 /** Fully normalized policy used by the mutation path. */
 export interface UsageLedgerRetention {

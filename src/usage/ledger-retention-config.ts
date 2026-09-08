@@ -6,13 +6,8 @@ import {
   DEFAULT_USAGE_LEDGER_MAX_BYTES,
   MIN_USAGE_LEDGER_MAX_BYTES,
   normalizeUsageLedgerRetention,
-  type PersistedUsageLedgerRetention,
   type UsageLedgerRetention,
 } from "./ledger-retention";
-
-type ConfigWithUsageLedgerRetention = OcxConfig & {
-  usageLedgerRetention?: PersistedUsageLedgerRetention;
-};
 
 export type UsageLedgerRetentionStatus = UsageLedgerRetention & {
   currentBytes: number;
@@ -21,7 +16,7 @@ export type UsageLedgerRetentionStatus = UsageLedgerRetention & {
 
 /** Read the opt-in policy from config. Unknown/malformed persisted keys fail closed. */
 export function readUsageLedgerRetentionFromConfig(config?: OcxConfig): UsageLedgerRetention {
-  const source = (config ?? loadConfig()) as ConfigWithUsageLedgerRetention;
+  const source = config ?? loadConfig();
   return normalizeUsageLedgerRetention(source.usageLedgerRetention);
 }
 
@@ -69,7 +64,7 @@ export function writeUsageLedgerRetentionToConfig(policy: UsageLedgerRetention):
     enabled: policy.enabled,
     maxBytes: policy.maxBytes,
   });
-  const config = loadConfig() as ConfigWithUsageLedgerRetention;
+  const config = loadConfig();
   config.usageLedgerRetention = {
     enabled: normalized.enabled,
     maxBytes: normalized.maxBytes,
@@ -83,7 +78,7 @@ export function applyUsageLedgerRetentionToLiveConfig(
   config: OcxConfig,
   policy: UsageLedgerRetention,
 ): void {
-  (config as ConfigWithUsageLedgerRetention).usageLedgerRetention = {
+  config.usageLedgerRetention = {
     enabled: policy.enabled,
     maxBytes: policy.maxBytes,
   };
