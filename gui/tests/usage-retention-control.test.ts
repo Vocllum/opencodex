@@ -4,6 +4,7 @@ import { act, createElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import UsageLedgerRetentionControl from "../src/components/usage/UsageLedgerRetentionControl";
 import { LanguageProvider } from "../src/i18n";
+import { useI18n } from "../src/i18n/shared";
 
 const globals = ["document", "window", "navigator", "localStorage", "fetch", "IS_REACT_ACT_ENVIRONMENT"] as const;
 type GlobalName = (typeof globals)[number];
@@ -41,6 +42,13 @@ afterEach(async () => {
   await testWindow.happyDOM?.close?.();
 });
 
+async function settleTimers(): Promise<void> {
+  await act(async () => {
+    await new Promise<void>(resolve => testWindow.setTimeout(resolve, 0));
+    await Promise.resolve();
+  });
+}
+
 async function mount(apiBase: string): Promise<void> {
   await act(async () => {
     root = createRoot(host);
@@ -50,10 +58,17 @@ async function mount(apiBase: string): Promise<void> {
       createElement(UsageLedgerRetentionControl, { apiBase }),
     ));
   });
-  await act(async () => {
-    await new Promise<void>(resolve => testWindow.setTimeout(resolve, 0));
-    await Promise.resolve();
-  });
+  await settleTimers();
+}
+
+function LocaleHarness({ apiBase }: { apiBase: string }) {
+  const { setLocale } = useI18n();
+  return createElement(
+    "div",
+    null,
+    createElement("button", { type: "button", id: "locale-switch", onClick: () => setLocale("de") }, "locale"),
+    createElement(UsageLedgerRetentionControl, { apiBase }),
+  );
 }
 
 test("retention control stays on Usage and out of Storage", async () => {
@@ -89,6 +104,8 @@ test("renders one switch and toggles without rewriting the saved byte ceiling", 
   expect(host.querySelector('[aria-haspopup="listbox"]')).toBeNull();
   expect(switches[0].disabled).toBe(false);
   expect(switches[0].getAttribute("aria-pressed")).toBe("false");
+  expect(host.querySelector(".usage-retention-state")?.textContent).toBe("Unlimited");
+  expect(host.querySelector(".usage-retention-limit")?.classList.contains("is-disabled")).toBe(true);
 
   await act(async () => {
     switches[0].click();
@@ -96,6 +113,8 @@ test("renders one switch and toggles without rewriting the saved byte ceiling", 
   });
   expect(writes[0]).toEqual({ enabled: true, maxBytes });
   expect(switches[0].getAttribute("aria-pressed")).toBe("true");
+  expect(host.querySelector(".usage-retention-state")).toBeNull();
+  expect(host.querySelector(".usage-retention-limit")?.classList.contains("is-disabled")).toBe(false);
 
   await act(async () => {
     switches[0].click();
@@ -103,6 +122,53 @@ test("renders one switch and toggles without rewriting the saved byte ceiling", 
   });
   expect(writes[1]).toEqual({ enabled: false, maxBytes });
   expect(switches[0].getAttribute("aria-pressed")).toBe("false");
+  expect(host.querySelector(".usage-retention-state")?.textContent).toBe("Unlimited");
+  expect(host.querySelector(".usage-retention-limit")?.classList.contains("is-disabled")).toBe(true);
+});
+
+test("a stale GET cannot repaint policy after a successful toggle", async () => {
+  const apiBase = "http://usage-retention-stale";
+  const maxBytes = 1024 * 1024 * 1024;
+  let getCount = 0;
+  let resolveStaleGet: ((response: Response) => void) | undefined;
+
+  globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url !== `${apiBase}/api/storage/usage-ledger-retention`) throw new Error(`unexpected fetch: ${url}`);
+    if ((init?.method ?? "GET") === "PUT") {
+      return Promise.resolve(Response.json({ enabled: true, maxBytes, currentBytes: 1234 }));
+    }
+    getCount += 1;
+    if (getCount === 1) return Promise.resolve(Response.json({ enabled: false, maxBytes, currentBytes: 1234 }));
+    return new Promise<Response>(resolve => { resolveStaleGet = resolve; });
+  }) as typeof fetch;
+
+  await act(async () => {
+    root = createRoot(host);
+    root.render(createElement(LanguageProvider, null, createElement(LocaleHarness, { apiBase })));
+  });
+  await settleTimers();
+
+  const localeSwitch = host.querySelector<HTMLButtonElement>("#locale-switch");
+  if (!localeSwitch) throw new Error("locale switch missing");
+  await act(async () => { localeSwitch.click(); });
+  await settleTimers();
+  expect(getCount).toBe(2);
+
+  const toggle = host.querySelector<HTMLButtonElement>("button.switch");
+  if (!toggle) throw new Error("retention switch missing");
+  await act(async () => {
+    toggle.click();
+    await Promise.resolve();
+  });
+  expect(toggle.getAttribute("aria-pressed")).toBe("true");
+
+  if (!resolveStaleGet) throw new Error("stale GET was not started");
+  await act(async () => {
+    resolveStaleGet(Response.json({ enabled: false, maxBytes, currentBytes: 1234 }));
+    await Promise.resolve();
+  });
+  expect(toggle.getAttribute("aria-pressed")).toBe("true");
 });
 
 test("failed toggle keeps the last server state and surfaces an error", async () => {
