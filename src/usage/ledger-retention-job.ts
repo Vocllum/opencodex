@@ -1,5 +1,7 @@
 import { chmodSync, statSync, unlinkSync } from "node:fs";
+import { dirname } from "node:path";
 import { renameAtomicFile } from "../lib/windows-atomic-replace";
+import { discardRequestHistoryProjection } from "../routing/history/discard-index";
 import { closeRequestHistoryIndex } from "../routing/history/indexer";
 import { getActiveTurnCount } from "../server/lifecycle";
 import {
@@ -40,6 +42,7 @@ export interface UsageLedgerRetentionJobState {
 export interface UsageLedgerRetentionCommitDeps {
   activeTurnCount?: () => number;
   closeHistoryIndex?: () => void;
+  discardHistoryProjection?: (configDir: string) => boolean;
   stat?: typeof statSync;
   rename?: (source: string, destination: string) => void;
   chmod?: typeof chmodSync;
@@ -80,6 +83,7 @@ export function commitPreparedUsageLedgerCompaction(
 ): UsageLedgerRetentionJobOutcome {
   const activeTurnCount = deps.activeTurnCount ?? getActiveTurnCount;
   const closeHistoryIndex = deps.closeHistoryIndex ?? closeRequestHistoryIndex;
+  const discardHistoryProjection = deps.discardHistoryProjection ?? discardRequestHistoryProjection;
   const stat = deps.stat ?? statSync;
   // Keep the final publication synchronous. The shared helper retries the short
   // Windows sharing-violation window with sleepSync, so no request callback can
@@ -128,10 +132,24 @@ export function commitPreparedUsageLedgerCompaction(
 
   try {
     // The index is a disposable projection of usage.jsonl. Drop its live handle
-    // before replacing the canonical source; the next query reopens/rebuilds it.
+    // before replacing the canonical source so Windows cannot hold the source-adjacent
+    // projection open during publication.
     closeHistoryIndex();
     rename(prepared.tempPath, prepared.path);
     try { chmod(prepared.path, 0o600); } catch { /* platform may ignore chmod */ }
+
+    // Publication succeeded. Reclaim the now-stale derived SQLite projection immediately
+    // instead of waiting for a later history query to notice the source identity change.
+    // This cleanup must never reverse a successful canonical-ledger commit.
+    try {
+      const discarded = discardHistoryProjection(dirname(prepared.path));
+      if (!discarded) {
+        console.warn("[usage] request-history projection cleanup was incomplete; a later history access will rebuild it");
+      }
+    } catch {
+      console.warn("[usage] request-history projection cleanup failed; a later history access will rebuild it");
+    }
+
     return {
       ok: true,
       beforeBytes: prepared.beforeBytes,
