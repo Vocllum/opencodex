@@ -305,10 +305,13 @@ export function maybeRequestUsageLedgerRetentionRun(): void {
 /** Join an active retention Worker during final server teardown. */
 export async function abortUsageLedgerRetentionJobAsync(): Promise<void> {
   runGeneration += 1;
+  const worker = activeWorker;
+  const job = inflight;
   const cancel = cancelActiveRun;
   cancelActiveRun = null;
   cancel?.();
-  const worker = activeWorker;
+  if (worker) await terminateStorageWorker(worker);
+  if (job) await job.catch(() => undefined);
   activeWorker = null;
   inflight = null;
   if (state.status === "running") {
@@ -320,7 +323,6 @@ export async function abortUsageLedgerRetentionJobAsync(): Promise<void> {
       lastOutcome: { ok: false, error: "worker_failed" },
     };
   }
-  if (worker) await terminateStorageWorker(worker);
 }
 
 /** Test reset for the module-local controller state. */
