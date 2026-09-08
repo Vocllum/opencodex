@@ -191,7 +191,11 @@ export default function UsageLedgerRetentionPanel({
       </div>
 
       <div className="storage-policy-actions storage-retention-actions">
-        <div className="storage-retention-presets" aria-label={t("storage.usageRetention.limit")}>
+        <div
+          className="storage-retention-presets"
+          role="group"
+          aria-label={t("storage.usageRetention.limit")}
+        >
           {PRESETS_MIB.map(value => (
             <button
               key={value}
