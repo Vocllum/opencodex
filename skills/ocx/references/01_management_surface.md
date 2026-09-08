@@ -583,6 +583,29 @@ JSON mode: `payload`.
 - `policy set` never enables implicitly: omitting `--enabled` keeps the stored value.
 - `policy run` forces a run regardless of schedule, so it needs `--yes`.
 
+### `ocx storage usage-limit`
+
+Show, change, or run the usage-history size limit.
+
+| Method | Route |
+|---|---|
+| GET | `/api/storage/usage-ledger-retention` |
+| PUT | `/api/storage/usage-ledger-retention` |
+| POST | `/api/storage/usage-ledger-retention/run` |
+
+| Flag | Value | Meaning |
+|---|---|---|
+| `--enabled` | string | true or false. |
+| `--mib` | number | Maximum usage-ledger size in MiB; minimum 1. |
+| `--yes` | boolean | Required for `usage-limit run`, which permanently removes older history. |
+| `--json` | boolean | Emit the policy, status, or run state as JSON. |
+
+JSON mode: `payload`.
+
+- The limit is opt-in; a bare invocation only reads status.
+- Changing the MiB value without `--enabled` preserves the saved enabled state.
+- A manual run permanently removes older usage rows, so it requires `--yes`.
+
 ### `ocx system codex-restart`
 
 Restart the Codex app-server.
@@ -687,6 +710,6 @@ JSON mode: `payload`.
 
 ## Counts
 
-- declared capabilities: 37
-- of those, state-changing: 16
+- declared capabilities: 38
+- of those, state-changing: 17
 - head-resolved invocations: 2
