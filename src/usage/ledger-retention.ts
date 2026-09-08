@@ -62,7 +62,8 @@ export type UsageLedgerCompactionPreparation =
  *
  * Unknown keys disable the feature rather than being silently stripped: a typo
  * such as `maxByets` must never turn an intended large limit into the default.
- * Invalid/unsafe byte values likewise disable the feature.
+ * Invalid/unsafe byte values likewise disable the feature. A valid maxBytes is
+ * retained while disabled so toggling the feature off does not erase user choice.
  */
 export function normalizeUsageLedgerRetention(raw: unknown): UsageLedgerRetention {
   const disabled = { enabled: false, maxBytes: DEFAULT_USAGE_LEDGER_MAX_BYTES } as const;
@@ -73,7 +74,6 @@ export function normalizeUsageLedgerRetention(raw: unknown): UsageLedgerRetentio
   const allowed = new Set(["enabled", "maxBytes"]);
   if (Object.keys(row).some(key => !allowed.has(key))) return disabled;
   if (row.enabled !== undefined && typeof row.enabled !== "boolean") return disabled;
-  if (row.enabled !== true) return disabled;
 
   const maxBytes = row.maxBytes ?? DEFAULT_USAGE_LEDGER_MAX_BYTES;
   if (
@@ -83,7 +83,7 @@ export function normalizeUsageLedgerRetention(raw: unknown): UsageLedgerRetentio
   ) {
     return disabled;
   }
-  return { enabled: true, maxBytes };
+  return { enabled: row.enabled === true, maxBytes };
 }
 
 /** Snapshot the identity fields used to prove the source did not change. */
