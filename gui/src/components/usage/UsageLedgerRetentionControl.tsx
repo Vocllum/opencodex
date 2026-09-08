@@ -58,6 +58,7 @@ export default function UsageLedgerRetentionControl({ apiBase }: { apiBase: stri
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const loadGeneration = useRef(0);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async (signal?: AbortSignal) => {
     const generation = ++loadGeneration.current;
@@ -176,6 +177,7 @@ export default function UsageLedgerRetentionControl({ apiBase }: { apiBase: stri
               }}
             >
               <input
+                ref={inputRef}
                 className="input mono codex-auto-switch-input"
                 type="number"
                 min={1}
@@ -208,10 +210,12 @@ export default function UsageLedgerRetentionControl({ apiBase }: { apiBase: stri
                 incrementLabel={t("usage.retention.increase")}
                 decrementLabel={t("usage.retention.decrease")}
                 onIncrement={() => {
+                  inputRef.current?.focus();
                   setEditing(true);
                   setCustomDraft(clampNumberDraft(customDraft, 1, 1, MAX_MIB));
                 }}
                 onDecrement={() => {
+                  inputRef.current?.focus();
                   setEditing(true);
                   setCustomDraft(clampNumberDraft(customDraft, -1, 1, MAX_MIB));
                 }}
