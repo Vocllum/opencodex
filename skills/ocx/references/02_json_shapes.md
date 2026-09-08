@@ -37,7 +37,7 @@ One row per line. The fields worth branching on:
 | Field | Meaning |
 |---|---|
 | `requestId` | pass to `ocx logs explain` |
-| `conversationId` | groups a conversation; also printed as `conv=<id>` in human output |
+| `conversationId` | groups a conversation; also printed as `conv=<id>` |
 | `provider` / `model` | what actually served it |
 | `requestedModel` / `requestedAlias` | what the client asked for |
 | `status` / `durationMs` | outcome |
@@ -119,11 +119,12 @@ one with 409. The CLI handles that for you — it always previews first.
 The status response is the management payload:
 
 ```json
-{"enabled":false,"maxBytes":134217728,"currentBytes":67108864,"overLimit":false,"job":{"status":"idle"}}
+{"enabled":false,"maxBytes":1073741824,"currentBytes":67108864,"overLimit":false,"job":{"status":"idle"}}
 ```
 
-The default policy is Unlimited (`enabled:false`); `maxBytes` is the saved ceiling that becomes
-effective only after enabling retention.
+The default policy is Unlimited (`enabled:false`). On an unconfigured installation, `maxBytes`
+remembers 1 GiB (`1073741824`) as the ceiling used on first enable; later API/CLI changes preserve
+the saved ceiling while retention is disabled.
 
 `set` returns the same fields with `ok: true`; it merges only the fields supplied by
 `--enabled` and `--mib`. Oversized ledgers are compacted by the automatic scheduler after the
