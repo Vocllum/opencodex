@@ -55,6 +55,10 @@ export default function UsageLedgerRetentionPanel({
 
   useEffect(() => {
     const controller = new AbortController();
+    // `load` awaits the management API before committing its snapshot, so this
+    // is an external subscription update rather than a synchronous render
+    // cascade. Keep the initial fetch in the effect to preserve cancellation.
+    // eslint-disable-next-line react-hooks/set-state-in-effect, react/react-compiler
     void load(controller.signal).catch(errorValue => {
       if ((errorValue as { name?: string })?.name !== "AbortError") {
         setError(t("storage.usageRetention.error"));
@@ -163,7 +167,7 @@ export default function UsageLedgerRetentionPanel({
             aria-label={t("storage.usageRetention.limit")}
             style={{ width: 96 }}
           />
-          <span className="muted mono">MiB</span>
+          <span className="muted mono">{t("storage.usageRetention.unitMiB")}</span>
         </span>
       </div>
 
@@ -176,7 +180,9 @@ export default function UsageLedgerRetentionPanel({
             disabled={busy}
             onClick={() => setLimitMiB(value)}
           >
-            {value >= 1024 ? `${value / 1024} GiB` : `${value} MiB`}
+            {value >= 1024
+              ? `${value / 1024} ${t("storage.usageRetention.unitGiB")}`
+              : `${value} ${t("storage.usageRetention.unitMiB")}`}
           </button>
         ))}
         <button type="button" className="btn btn-sm" disabled={busy} onClick={() => void save()}>

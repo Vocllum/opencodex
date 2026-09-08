@@ -22,7 +22,10 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   }, [locale]);
 
   const t: TFn = useCallback(
-    (key, vars) => interpolate(DICTS[locale][key] ?? en[key] ?? key, vars),
+    (key, vars) => interpolate(
+      DICTS[locale][key] ?? (key in en ? en[key as keyof typeof en] : undefined) ?? key,
+      vars,
+    ),
     [locale],
   );
   const value = useMemo(() => ({ locale, setLocale, t }), [locale, t]);

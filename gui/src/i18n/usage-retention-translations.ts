@@ -6,6 +6,8 @@ export type UsageRetentionCatalogKey =
   | "storage.usageRetention.enabled"
   | "storage.usageRetention.current"
   | "storage.usageRetention.limit"
+  | "storage.usageRetention.unitMiB"
+  | "storage.usageRetention.unitGiB"
   | "storage.usageRetention.save"
   | "storage.usageRetention.apply"
   | "storage.usageRetention.saving"
@@ -21,6 +23,8 @@ const en: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.enabled": "Limit usage history size",
   "storage.usageRetention.current": "Current size",
   "storage.usageRetention.limit": "Maximum size",
+  "storage.usageRetention.unitMiB": "MiB",
+  "storage.usageRetention.unitGiB": "GiB",
   "storage.usageRetention.save": "Save",
   "storage.usageRetention.apply": "Apply now",
   "storage.usageRetention.saving": "Saving…",
@@ -37,6 +41,8 @@ const de: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.enabled": "Größe des Nutzungsverlaufs begrenzen",
   "storage.usageRetention.current": "Aktuelle Größe",
   "storage.usageRetention.limit": "Maximale Größe",
+  "storage.usageRetention.unitMiB": "MiB",
+  "storage.usageRetention.unitGiB": "GiB",
   "storage.usageRetention.save": "Speichern",
   "storage.usageRetention.apply": "Jetzt anwenden",
   "storage.usageRetention.saving": "Wird gespeichert…",
@@ -53,6 +59,8 @@ const fr: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.enabled": "Limiter la taille de l’historique d’utilisation",
   "storage.usageRetention.current": "Taille actuelle",
   "storage.usageRetention.limit": "Taille maximale",
+  "storage.usageRetention.unitMiB": "MiB",
+  "storage.usageRetention.unitGiB": "GiB",
   "storage.usageRetention.save": "Enregistrer",
   "storage.usageRetention.apply": "Appliquer maintenant",
   "storage.usageRetention.saving": "Enregistrement…",
@@ -69,6 +77,8 @@ const ko: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.enabled": "사용 기록 크기 제한",
   "storage.usageRetention.current": "현재 크기",
   "storage.usageRetention.limit": "최대 크기",
+  "storage.usageRetention.unitMiB": "MiB",
+  "storage.usageRetention.unitGiB": "GiB",
   "storage.usageRetention.save": "저장",
   "storage.usageRetention.apply": "지금 적용",
   "storage.usageRetention.saving": "저장 중…",
@@ -85,6 +95,8 @@ const zh: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.enabled": "限制 Usage 历史大小",
   "storage.usageRetention.current": "当前大小",
   "storage.usageRetention.limit": "最大大小",
+  "storage.usageRetention.unitMiB": "MiB",
+  "storage.usageRetention.unitGiB": "GiB",
   "storage.usageRetention.save": "保存",
   "storage.usageRetention.apply": "立即应用",
   "storage.usageRetention.saving": "正在保存…",
@@ -101,6 +113,8 @@ const zhTW: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.enabled": "限制 Usage 歷史大小",
   "storage.usageRetention.current": "目前大小",
   "storage.usageRetention.limit": "最大大小",
+  "storage.usageRetention.unitMiB": "MiB",
+  "storage.usageRetention.unitGiB": "GiB",
   "storage.usageRetention.save": "儲存",
   "storage.usageRetention.apply": "立即套用",
   "storage.usageRetention.saving": "正在儲存…",
@@ -117,6 +131,8 @@ const ru: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.enabled": "Ограничить размер истории использования",
   "storage.usageRetention.current": "Текущий размер",
   "storage.usageRetention.limit": "Максимальный размер",
+  "storage.usageRetention.unitMiB": "MiB",
+  "storage.usageRetention.unitGiB": "GiB",
   "storage.usageRetention.save": "Сохранить",
   "storage.usageRetention.apply": "Применить сейчас",
   "storage.usageRetention.saving": "Сохранение…",
@@ -133,6 +149,8 @@ const ja: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.enabled": "使用履歴のサイズを制限",
   "storage.usageRetention.current": "現在のサイズ",
   "storage.usageRetention.limit": "最大サイズ",
+  "storage.usageRetention.unitMiB": "MiB",
+  "storage.usageRetention.unitGiB": "GiB",
   "storage.usageRetention.save": "保存",
   "storage.usageRetention.apply": "今すぐ適用",
   "storage.usageRetention.saving": "保存中…",
@@ -149,6 +167,8 @@ const tr: Record<UsageRetentionCatalogKey, string> = {
   "storage.usageRetention.enabled": "Kullanım geçmişi boyutunu sınırla",
   "storage.usageRetention.current": "Geçerli boyut",
   "storage.usageRetention.limit": "Maksimum boyut",
+  "storage.usageRetention.unitMiB": "MiB",
+  "storage.usageRetention.unitGiB": "GiB",
   "storage.usageRetention.save": "Kaydet",
   "storage.usageRetention.apply": "Şimdi uygula",
   "storage.usageRetention.saving": "Kaydediliyor…",
