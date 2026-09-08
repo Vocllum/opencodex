@@ -3,6 +3,7 @@ import {
   appendFileSync,
   existsSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   renameSync,
   rmSync,
@@ -20,7 +21,14 @@ import {
   usageLedgerRevisionMatches,
 } from "../src/usage/ledger-retention";
 import { parseUsageLedgerRetentionInput } from "../src/usage/ledger-retention-config";
-import { commitPreparedUsageLedgerCompaction } from "../src/usage/ledger-retention-job";
+import {
+  commitPreparedUsageLedgerCompaction,
+  getUsageLedgerRetentionJobState,
+  invalidateUsageLedgerRetentionRun,
+  requestUsageLedgerRetentionRun,
+  resetUsageLedgerRetentionJobForTests,
+} from "../src/usage/ledger-retention-job";
+import { getConfigPath, getDefaultConfig, saveConfig } from "../src/config";
 
 const homes: string[] = [];
 
@@ -41,9 +49,19 @@ function jsonlRowOfSize(requestId: string, totalBytes: number, fill = "x"): stri
   return row;
 }
 
-afterEach(() => {
+afterEach(async () => {
+  await resetUsageLedgerRetentionJobForTests();
   for (const dir of homes.splice(0)) rmSync(dir, { recursive: true, force: true });
 });
+
+async function waitForRetentionIdle(timeoutMs = 10_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (getUsageLedgerRetentionJobState().status === "idle") return;
+    await Bun.sleep(10);
+  }
+  throw new Error("timed out waiting for usage ledger retention job");
+}
 
 describe("usage ledger retention v2", () => {
   test("unknown persisted config keys disable destructive retention", () => {
@@ -72,7 +90,7 @@ describe("usage ledger retention v2", () => {
   });
 
   test("unsafe or below-floor byte limits disable destructive retention", () => {
-    for (const maxBytes of [Number.MAX_SAFE_INTEGER + 1, MIN_USAGE_LEDGER_MAX_BYTES - 1, 1.5 * MIN_USAGE_LEDGER_MAX_BYTES]) {
+    for (const maxBytes of [Number.MAX_SAFE_INTEGER + 1, MIN_USAGE_LEDGER_MAX_BYTES - 1, MIN_USAGE_LEDGER_MAX_BYTES + 0.5]) {
       expect(normalizeUsageLedgerRetention({ enabled: true, maxBytes }).enabled).toBe(false);
     }
   });
@@ -287,5 +305,40 @@ describe("usage ledger retention v2", () => {
     expect(discarded).toBe(false);
     expect(existsSync(prepared.tempPath)).toBe(false);
     expect(readFileSync(path, "utf8")).toBe(original);
+  });
+
+  test("invalidating a policy generation prevents a prepared Worker candidate from publishing", async () => {
+    const dir = home();
+    const previousHome = process.env.OPENCODEX_HOME;
+    process.env.OPENCODEX_HOME = dir;
+    try {
+      const maxBytes = MIN_USAGE_LEDGER_MAX_BYTES;
+      const config = {
+        ...getDefaultConfig(),
+        usageLedgerRetention: { enabled: true, maxBytes },
+      };
+      saveConfig(config);
+
+      const path = join(dir, "usage.jsonl");
+      const original = jsonlRowOfSize("old", maxBytes) + jsonlRowOfSize("new", 256);
+      writeFileSync(path, original);
+
+      const started = requestUsageLedgerRetentionRun();
+      expect(started.accepted).toBe(true);
+      // The generation is invalidated while the Worker is still preparing its read-only
+      // candidate. The stale result must be discarded before the atomic publish step.
+      invalidateUsageLedgerRetentionRun();
+      await waitForRetentionIdle();
+
+      expect(readFileSync(path, "utf8")).toBe(original);
+      expect(getUsageLedgerRetentionJobState().lastOutcome).toBeUndefined();
+      expect(readdirSync(dir).filter(name => name.includes(".retention-")).length).toBe(0);
+    } finally {
+      if (previousHome === undefined) delete process.env.OPENCODEX_HOME;
+      else process.env.OPENCODEX_HOME = previousHome;
+      // Keep the config path import exercised against the isolated home and ensure no
+      // accidental write escaped into the test process's default configuration.
+      expect(getConfigPath()).not.toBe(join(dir, "config.json"));
+    }
   });
 });
