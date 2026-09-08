@@ -20,6 +20,7 @@ import {
 } from "../../usage/ledger-retention-config";
 import {
   getUsageLedgerRetentionJobState,
+  invalidateUsageLedgerRetentionRun,
   requestUsageLedgerRetentionRun,
 } from "../../usage/ledger-retention-job";
 import { jsonResponse } from "../auth-cors";
@@ -31,10 +32,12 @@ import type { ManagementContext } from "./context";
 
 const INSPECTION_FAILED_MESSAGE = "Codex log inspection failed";
 
+/** Report whether the Log Guard schema cannot be inspected on this install. */
 function inspectionUnavailable(report: CodexLogGuardStatus): boolean {
   return report.schema.state === "unavailable";
 }
 
+/** Map a Log Guard mutation result to its management HTTP status. */
 function mutationStatus(result: CodexLogGuardMutationResult): number {
   if (result.ok) return 200;
   switch (result.error) {
@@ -52,6 +55,7 @@ function mutationStatus(result: CodexLogGuardMutationResult): number {
   }
 }
 
+/** Map a Log Guard compaction result to its management HTTP status. */
 function compactStatus(result: CodexLogGuardCompactionResult): number {
   if (result.ok) return 200;
   switch (result.error) {
@@ -69,6 +73,7 @@ function compactStatus(result: CodexLogGuardCompactionResult): number {
   }
 }
 
+/** Serialize a Log Guard mutation result through the shared CORS-aware JSON helper. */
 function mutationResponse(
   result: CodexLogGuardMutationResult,
   ctx: ManagementContext,
@@ -78,6 +83,7 @@ function mutationResponse(
     : jsonResponse({ error: result.error }, mutationStatus(result), ctx.req, ctx.config);
 }
 
+/** Serialize a Log Guard compaction result through the shared CORS-aware JSON helper. */
 function compactResponse(
   result: CodexLogGuardCompactionResult,
   ctx: ManagementContext,
@@ -95,6 +101,7 @@ function compactResponse(
   );
 }
 
+/** Parse the explicit Log Guard protection mode from a bounded management body. */
 async function readProtectMode(ctx: ManagementContext): Promise<"compat" | "quiet" | Response> {
   let body: unknown;
   try {
@@ -141,6 +148,9 @@ export async function handleStorageLogGuardRoutes(ctx: ManagementContext): Promi
       try {
         const saved = writeUsageLedgerRetentionToConfig(parsed.policy);
         applyUsageLedgerRetentionToLiveConfig(config, saved);
+        // Every policy change invalidates the snapshot captured by an older Worker.
+        // The old preparation may finish, but its generation can no longer commit.
+        invalidateUsageLedgerRetentionRun();
         // PUT changes policy only. Automatic enforcement belongs to the scheduler;
         // the explicit /run route is the operator's immediate destructive action.
         return jsonResponse({
