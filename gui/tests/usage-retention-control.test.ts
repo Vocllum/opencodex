@@ -1,23 +1,130 @@
-import { expect, test } from "bun:test";
+import { afterEach, beforeEach, expect, test } from "bun:test";
+import { Window } from "happy-dom";
+import { act, createElement } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import UsageLedgerRetentionControl from "../src/components/usage/UsageLedgerRetentionControl";
+import { LanguageProvider } from "../src/i18n";
 
-test("Usage retention control stays a small native-control surface", async () => {
-  const component = await Bun.file(new URL("../src/components/usage/UsageLedgerRetentionControl.tsx", import.meta.url)).text();
+const globals = ["document", "window", "navigator", "localStorage", "fetch", "IS_REACT_ACT_ENVIRONMENT"] as const;
+type GlobalName = (typeof globals)[number];
+
+let previous: Record<GlobalName, PropertyDescriptor | undefined>;
+let testWindow: Window;
+let root: Root | null = null;
+let host: HTMLElement;
+
+function restoreProperty(target: object, key: PropertyKey, descriptor: PropertyDescriptor | undefined): void {
+  if (descriptor) Object.defineProperty(target, key, descriptor);
+  else Reflect.deleteProperty(target, key);
+}
+
+beforeEach(() => {
+  previous = Object.fromEntries(
+    globals.map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]),
+  ) as typeof previous;
+  testWindow = new Window({ url: "http://localhost/" });
+  Object.defineProperties(globalThis, {
+    document: { configurable: true, value: testWindow.document },
+    window: { configurable: true, value: testWindow },
+    navigator: { configurable: true, value: testWindow.navigator },
+    localStorage: { configurable: true, value: testWindow.localStorage },
+    IS_REACT_ACT_ENVIRONMENT: { configurable: true, value: true },
+  });
+  host = testWindow.document.createElement("div") as never as HTMLElement;
+  testWindow.document.body.appendChild(host as never);
+});
+
+afterEach(async () => {
+  if (root) await act(async () => root?.unmount());
+  root = null;
+  for (const key of globals) restoreProperty(globalThis, key, previous[key]);
+  await testWindow.happyDOM?.close?.();
+});
+
+async function mount(apiBase: string): Promise<void> {
+  await act(async () => {
+    root = createRoot(host);
+    root.render(createElement(
+      LanguageProvider,
+      null,
+      createElement(UsageLedgerRetentionControl, { apiBase }),
+    ));
+  });
+  await act(async () => {
+    await new Promise<void>(resolve => testWindow.setTimeout(resolve, 0));
+    await Promise.resolve();
+  });
+}
+
+test("retention control stays on Usage and out of Storage", async () => {
   const page = await Bun.file(new URL("../src/pages/Usage.tsx", import.meta.url)).text();
   const storageWorkspace = await Bun.file(new URL("../src/components/storage-workspace/StorageWorkspace.tsx", import.meta.url)).text();
 
   expect(page).toContain("UsageLedgerRetentionControl");
   expect(storageWorkspace).not.toContain("UsageLedgerRetentionPanel");
-  expect(component).toContain("<Switch");
-  expect(component).toContain("<Select");
-  expect(component).toContain("const selectedValue = customOpen");
-  expect(component).toContain("? UNLIMITED_OPTION");
-  expect(component).toContain('const UNLIMITED_OPTION = "unlimited"');
-  expect(component).not.toContain("useState(512");
-  expect(component).toContain("models.custom");
-  expect(component).toContain("models.customApply");
-  expect(component).toContain("enabled && limitMiB !== null ? String(limitMiB) : \"\"");
-  expect(component).not.toContain("/run");
-  expect(component).not.toContain("setInterval");
-  expect(component).not.toContain("hasUnsavedChanges");
-  expect(component).not.toContain("storage-retention-");
+});
+
+test("renders one switch and toggles without rewriting the saved byte ceiling", async () => {
+  const apiBase = "http://usage-retention-test";
+  const maxBytes = 512 * 1024 * 1024 + 17;
+  const writes: Array<{ enabled: boolean; maxBytes: number }> = [];
+  let enabled = false;
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url !== `${apiBase}/api/storage/usage-ledger-retention`) throw new Error(`unexpected fetch: ${url}`);
+    if ((init?.method ?? "GET") === "PUT") {
+      const body = JSON.parse(String(init?.body)) as { enabled: boolean; maxBytes: number };
+      writes.push(body);
+      enabled = body.enabled;
+      return Response.json({ enabled, maxBytes, currentBytes: 1234 });
+    }
+    return Response.json({ enabled, maxBytes, currentBytes: 1234 });
+  }) as typeof fetch;
+
+  await mount(apiBase);
+
+  const switches = host.querySelectorAll<HTMLButtonElement>("button.switch");
+  expect(switches.length).toBe(1);
+  expect(host.querySelector('[aria-haspopup="listbox"]')).toBeNull();
+  expect(switches[0].disabled).toBe(false);
+  expect(switches[0].getAttribute("aria-pressed")).toBe("false");
+
+  await act(async () => {
+    switches[0].click();
+    await Promise.resolve();
+  });
+  expect(writes[0]).toEqual({ enabled: true, maxBytes });
+  expect(switches[0].getAttribute("aria-pressed")).toBe("true");
+
+  await act(async () => {
+    switches[0].click();
+    await Promise.resolve();
+  });
+  expect(writes[1]).toEqual({ enabled: false, maxBytes });
+  expect(switches[0].getAttribute("aria-pressed")).toBe("false");
+});
+
+test("failed toggle keeps the last server state and surfaces an error", async () => {
+  const apiBase = "http://usage-retention-failure";
+  const maxBytes = 256 * 1024 * 1024;
+
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url !== `${apiBase}/api/storage/usage-ledger-retention`) throw new Error(`unexpected fetch: ${url}`);
+    if ((init?.method ?? "GET") === "PUT") return new Response("", { status: 500 });
+    return Response.json({ enabled: false, maxBytes, currentBytes: 0 });
+  }) as typeof fetch;
+
+  await mount(apiBase);
+  const toggle = host.querySelector<HTMLButtonElement>("button.switch");
+  if (!toggle) throw new Error("retention switch missing");
+
+  await act(async () => {
+    toggle.click();
+    await Promise.resolve();
+  });
+
+  expect(toggle.getAttribute("aria-pressed")).toBe("false");
+  expect(host.querySelector('[role="alert"]')?.textContent?.length).toBeGreaterThan(0);
 });
