@@ -12,6 +12,16 @@ import {
   type CodexLogGuardStatus,
 } from "../../codex/log-guard/protection";
 import { scanStorage } from "../../storage/scanner";
+import {
+  applyUsageLedgerRetentionToLiveConfig,
+  getUsageLedgerRetentionStatus,
+  parseUsageLedgerRetentionInput,
+  writeUsageLedgerRetentionToConfig,
+} from "../../usage/ledger-retention-config";
+import {
+  getUsageLedgerRetentionJobState,
+  requestUsageLedgerRetentionRun,
+} from "../../usage/ledger-retention-job";
 import { jsonResponse } from "../auth-cors";
 import {
   managementBodyTooLargeResponse,
@@ -104,10 +114,72 @@ async function readProtectMode(ctx: ManagementContext): Promise<"compat" | "quie
   return mode;
 }
 
-/** Codex Log Guard diagnostics plus explicit protection and maintenance mutations. */
+/** Storage diagnostics plus explicit protection, retention, and maintenance mutations. */
 export async function handleStorageLogGuardRoutes(ctx: ManagementContext): Promise<Response | null> {
   const { req, url, config, deps } = ctx;
   const protectionDeps = deps.codexLogGuardProtectionDeps;
+
+  if (url.pathname === "/api/storage/usage-ledger-retention") {
+    if (req.method === "GET") {
+      return jsonResponse({
+        ...getUsageLedgerRetentionStatus(config),
+        job: getUsageLedgerRetentionJobState(),
+      }, 200, req, config);
+    }
+    if (req.method === "PUT") {
+      let body: unknown;
+      try {
+        body = await readManagementJsonBody(req);
+      } catch (error) {
+        const tooLarge = managementBodyTooLargeResponse(error, req, config);
+        if (tooLarge) return tooLarge;
+        return jsonResponse({ error: "invalid_json" }, 400, req, config);
+      }
+      const previous = getUsageLedgerRetentionStatus(config);
+      const parsed = parseUsageLedgerRetentionInput(body, previous);
+      if (!parsed.ok) return jsonResponse({ error: parsed.error }, 400, req, config);
+      try {
+        const saved = writeUsageLedgerRetentionToConfig(parsed.policy);
+        applyUsageLedgerRetentionToLiveConfig(config, saved);
+        const run = saved.enabled ? requestUsageLedgerRetentionRun() : null;
+        return jsonResponse({
+          ok: true,
+          ...getUsageLedgerRetentionStatus(config),
+          job: run?.state ?? getUsageLedgerRetentionJobState(),
+        }, 200, req, config);
+      } catch {
+        return jsonResponse({ error: "config_write_failed" }, 500, req, config);
+      }
+    }
+    return null;
+  }
+
+  if (url.pathname === "/api/storage/usage-ledger-retention/run" && req.method === "POST") {
+    const status = getUsageLedgerRetentionStatus(config);
+    if (!status.enabled) {
+      return jsonResponse({
+        ok: false,
+        error: "retention_disabled",
+        ...status,
+        job: getUsageLedgerRetentionJobState(),
+      }, 409, req, config);
+    }
+    const run = requestUsageLedgerRetentionRun();
+    if (!run.accepted) {
+      return jsonResponse({
+        ok: false,
+        error: "already_running",
+        ...status,
+        job: run.state,
+      }, 409, req, config);
+    }
+    return jsonResponse({
+      ok: true,
+      started: true,
+      ...status,
+      job: run.state,
+    }, 202, req, config);
+  }
 
   if (url.pathname === "/api/storage/codex-logs") {
     if (req.method !== "GET") return null;
