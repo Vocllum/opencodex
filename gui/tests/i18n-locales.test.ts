@@ -6,7 +6,19 @@ import {
   detectInitial,
 } from "../src/i18n/shared";
 import { en } from "../src/i18n/en";
+import { de } from "../src/i18n/de";
+import { fr } from "../src/i18n/fr";
+import { ko } from "../src/i18n/ko";
+import { zh } from "../src/i18n/zh";
+import { zhTW } from "../src/i18n/zh-TW";
+import { ru } from "../src/i18n/ru";
+import { ja } from "../src/i18n/ja";
+import { tr } from "../src/i18n/tr";
+import { LAB_CATALOG_OVERRIDES } from "../src/i18n/lab-translations";
+import { USAGE_RETENTION_CATALOG_OVERRIDES } from "../src/i18n/usage-retention-translations";
 import { formatUptime } from "../src/formatUptime";
+
+const BASE_DICTS = { en, de, fr, ko, zh, "zh-TW": zhTW, ru, ja, tr };
 
 describe("i18n locale contracts", () => {
   test("LOCALES and DICTS contain exactly the same locales", () => {
@@ -31,12 +43,36 @@ describe("i18n locale contracts", () => {
     }
   });
 
-  test("every locale catalog has exactly the English key set", () => {
+  test("every base locale catalog has exactly the English key set", () => {
     const expectedKeys = Object.keys(en).sort();
 
     for (const { code } of LOCALES) {
-      const actualKeys = Object.keys(DICTS[code]).sort();
+      const actualKeys = Object.keys(BASE_DICTS[code]).sort();
       expect(actualKeys).toEqual(expectedKeys);
+    }
+  });
+
+  test("catalog overlays preserve their key sets in every locale", () => {
+    const overlays = [
+      ["lab", LAB_CATALOG_OVERRIDES],
+      ["usage retention", USAGE_RETENTION_CATALOG_OVERRIDES],
+    ] as const;
+
+    for (const [name, catalog] of overlays) {
+      const expectedKeys = Object.keys(catalog.en).sort();
+
+      for (const { code } of LOCALES) {
+        expect(Object.keys(catalog[code]).sort(), `${name}.${code}`).toEqual(expectedKeys);
+
+        const prefix = name === "lab" ? "lab." : "storage.usageRetention.";
+        const composedKeys = Object.keys(DICTS[code])
+          .filter(key =>
+            key.startsWith(prefix) &&
+            !(name === "lab" && key.startsWith("lab.production.")),
+          )
+          .sort();
+        expect(composedKeys, `DICTS.${code}.${name}`).toEqual(expectedKeys);
+      }
     }
   });
 
