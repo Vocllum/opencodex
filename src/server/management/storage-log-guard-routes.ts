@@ -126,43 +126,41 @@ export async function handleStorageLogGuardRoutes(ctx: ManagementContext): Promi
   const { req, url, config, deps } = ctx;
   const protectionDeps = deps.codexLogGuardProtectionDeps;
 
-  if (url.pathname === "/api/storage/usage-ledger-retention") {
-    if (req.method === "GET") {
+  if (url.pathname === "/api/storage/usage-ledger-retention" && req.method === "GET") {
+    return jsonResponse({
+      ...getUsageLedgerRetentionStatus(config),
+      job: getUsageLedgerRetentionJobState(),
+    }, 200, req, config);
+  }
+
+  if (url.pathname === "/api/storage/usage-ledger-retention" && req.method === "PUT") {
+    let body: unknown;
+    try {
+      body = await readManagementJsonBody(req);
+    } catch (error) {
+      const tooLarge = managementBodyTooLargeResponse(error, req, config);
+      if (tooLarge) return tooLarge;
+      return jsonResponse({ error: "invalid_json" }, 400, req, config);
+    }
+    const previous = getUsageLedgerRetentionStatus(config);
+    const parsed = parseUsageLedgerRetentionInput(body, previous);
+    if (!parsed.ok) return jsonResponse({ error: parsed.error }, 400, req, config);
+    try {
+      const saved = writeUsageLedgerRetentionToConfig(parsed.policy);
+      applyUsageLedgerRetentionToLiveConfig(config, saved);
+      // Every policy change invalidates the snapshot captured by an older Worker.
+      // The old preparation may finish, but its generation can no longer commit.
+      invalidateUsageLedgerRetentionRun();
+      // PUT changes policy only. Automatic enforcement belongs to the scheduler;
+      // the explicit /run route is the operator's immediate destructive action.
       return jsonResponse({
+        ok: true,
         ...getUsageLedgerRetentionStatus(config),
         job: getUsageLedgerRetentionJobState(),
       }, 200, req, config);
+    } catch {
+      return jsonResponse({ error: "config_write_failed" }, 500, req, config);
     }
-    if (req.method === "PUT") {
-      let body: unknown;
-      try {
-        body = await readManagementJsonBody(req);
-      } catch (error) {
-        const tooLarge = managementBodyTooLargeResponse(error, req, config);
-        if (tooLarge) return tooLarge;
-        return jsonResponse({ error: "invalid_json" }, 400, req, config);
-      }
-      const previous = getUsageLedgerRetentionStatus(config);
-      const parsed = parseUsageLedgerRetentionInput(body, previous);
-      if (!parsed.ok) return jsonResponse({ error: parsed.error }, 400, req, config);
-      try {
-        const saved = writeUsageLedgerRetentionToConfig(parsed.policy);
-        applyUsageLedgerRetentionToLiveConfig(config, saved);
-        // Every policy change invalidates the snapshot captured by an older Worker.
-        // The old preparation may finish, but its generation can no longer commit.
-        invalidateUsageLedgerRetentionRun();
-        // PUT changes policy only. Automatic enforcement belongs to the scheduler;
-        // the explicit /run route is the operator's immediate destructive action.
-        return jsonResponse({
-          ok: true,
-          ...getUsageLedgerRetentionStatus(config),
-          job: getUsageLedgerRetentionJobState(),
-        }, 200, req, config);
-      } catch {
-        return jsonResponse({ error: "config_write_failed" }, 500, req, config);
-      }
-    }
-    return null;
   }
 
   if (url.pathname === "/api/storage/usage-ledger-retention/run" && req.method === "POST") {
