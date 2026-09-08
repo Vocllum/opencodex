@@ -16,6 +16,7 @@ import {
   logGuardSchemaStateLabel,
 } from "../../i18n/log-guard-state-labels";
 import { formatBytes } from "../../format-bytes";
+import UsageLedgerRetentionPanel from "./UsageLedgerRetentionPanel";
 
 export interface StorageLargestEntry {
   path: string;
@@ -625,6 +626,8 @@ export default function StorageWorkspace({
                 <div className="stw-summary-value mono stw-home-path" title={report.codexHome}>{report.codexHome}</div>
               </div>
             </div>
+
+            <UsageLedgerRetentionPanel apiBase={apiBase} locale={locale} />
 
             {displayedLogGuard ? (
               <CodexLogGuardPanel
