@@ -34,13 +34,16 @@ function unlinkDerivedFile(path: string): boolean {
  * the old projection here reclaims its disk immediately even when no later history query occurs.
  * Failure is non-fatal: the next index open still validates source identity and recreates it.
  *
+ * Sidecars are removed before the main database. If either sidecar remains locked, leave the
+ * main file in place too; the indexer can later discard the complete stale set rather than
+ * opening a fresh main database beside an old same-name WAL/SHM file.
+ *
  * `configDir` is injectable so isolated retention tests never touch the process' real config home.
  */
 export function discardRequestHistoryProjection(configDir = getConfigDir()): boolean {
   closeRequestHistoryIndex();
   const path = historyIndexPath(configDir);
-  const wal = unlinkDerivedFile(`${path}-wal`);
-  const shm = unlinkDerivedFile(`${path}-shm`);
-  const main = unlinkDerivedFile(path);
-  return main && wal && shm;
+  if (!unlinkDerivedFile(`${path}-wal`)) return false;
+  if (!unlinkDerivedFile(`${path}-shm`)) return false;
+  return unlinkDerivedFile(path);
 }
