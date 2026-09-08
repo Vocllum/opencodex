@@ -144,6 +144,7 @@ export function CodexAccountPoolCards({
             */}
             <details
               className="codex-account-more card-right"
+              style={{ position: "relative", display: "inline-block" }}
               open={moreOpen.has(a.id)}
               onToggle={e => {
                 const open = (e.currentTarget as HTMLDetailsElement).open;
@@ -151,7 +152,23 @@ export function CodexAccountPoolCards({
               }}
             >
               <summary className="btn btn-ghost btn-sm" aria-label={`${t("codexAuth.moreActions")} — ${a.email}`} title={t("codexAuth.moreActions")}>⋯</summary>
-              <div className="codex-account-more-body">
+              <div
+                className="codex-account-more-body"
+                style={{
+                  position: "absolute",
+                  top: "calc(100% + 6px)",
+                  right: 0,
+                  zIndex: 2,
+                  width: "max-content",
+                  maxWidth: "min(680px, calc(100vw - 48px))",
+                  flexBasis: "auto",
+                  padding: 8,
+                  justifyContent: "flex-end",
+                  background: "var(--surface)",
+                  border: "1px solid var(--border)",
+                  borderRadius: "var(--radius-sm)",
+                }}
+              >
                 <span className="mono text-caption muted">{t("prov.accountId")}: {displayAccountId(a.id)}</span>
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => idCopy.copy(a.id, a.id)}>
                   {idCopy.outcomeFor(a.id) === "copied" ? t("startup.copied") : t("codexAuth.copyId")}
