@@ -10,6 +10,12 @@ import {
   startStorageCleanupScheduler,
   stopStorageCleanupScheduler,
 } from "../storage/policy-scheduler";
+import { abortUsageLedgerRetentionJobAsync } from "../usage/ledger-retention-job";
+import {
+  scheduleUsageLedgerRetentionStartupRun,
+  startUsageLedgerRetentionScheduler,
+  stopUsageLedgerRetentionScheduler,
+} from "../usage/ledger-retention-scheduler";
 import { startQuotaResetPoller, stopQuotaResetPoller } from "../quota/reset-poller";
 import {
   cancelQueuedStorageWorkerSpawns,
@@ -60,6 +66,7 @@ function startProcessLoops(applyPolicy: PolicyApply): ProcessLoops {
     stateStoreSweeper = startStateStoreSweeper();
     setLivePolicyOwner(applyPolicy);
     startStorageCleanupScheduler();
+    startUsageLedgerRetentionScheduler();
     // Opt-in: the tick itself is a no-op unless config.quotaResetNotify is enabled with a
     // sink, and the interval is unref'd, so a default install pays one dormant timer.
     startQuotaResetPoller();
@@ -84,6 +91,7 @@ function startProcessLoops(applyPolicy: PolicyApply): ProcessLoops {
     memoryWatchdog?.stop();
     stateStoreSweeper?.stop();
     stopStorageCleanupScheduler();
+    stopUsageLedgerRetentionScheduler();
     stopQuotaResetPoller();
     setLivePolicyOwner(null);
     throw error;
@@ -96,19 +104,22 @@ function stopProcessLoops(): void {
   loops?.memoryWatchdog.stop();
   loops?.stateStoreSweeper.stop();
   stopStorageCleanupScheduler();
+  stopUsageLedgerRetentionScheduler();
   stopQuotaResetPoller();
   setLivePolicyOwner(null);
 }
 
 async function stopStoragePolicyWorker(): Promise<void> {
   cancelQueuedStorageWorkerSpawns();
-  const abortResult = await Promise.allSettled([abortStorageCleanupPolicyJobAsync()]);
-  if (abortResult[0]?.status === "rejected") {
+  const abortResult = await Promise.allSettled([
+    abortStorageCleanupPolicyJobAsync(),
+    abortUsageLedgerRetentionJobAsync(),
+  ]);
+  for (const result of abortResult) {
+    if (result.status !== "rejected") continue;
     console.warn(
-      "[storage] policy worker abort during server stop failed:",
-      abortResult[0].reason instanceof Error
-        ? abortResult[0].reason.message
-        : abortResult[0].reason,
+      "[storage] worker abort during server stop failed:",
+      result.reason instanceof Error ? result.reason.message : result.reason,
     );
   }
   try {
@@ -177,6 +188,7 @@ export function acquireServerBackgroundLifecycle(
     scheduleStartupRun() {
       if (owners.some(candidate => candidate.token === owner.token)) {
         scheduleStorageCleanupStartupRun();
+        scheduleUsageLedgerRetentionStartupRun();
       }
     },
     release() {
