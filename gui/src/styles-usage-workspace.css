@@ -246,6 +246,12 @@
   white-space: nowrap;
 }
 
+/* Match the Models context-cap cluster: keep the remembered value visible when off,
+   but visually demote it so Unlimited remains the active state. */
+.usage-retention-limit.is-disabled {
+  opacity: 0.55;
+}
+
 @media (max-width: 640px) {
   .usage-source-row { align-items: flex-start; flex-direction: column; }
   .usage-retention-heading { align-items: flex-start; }
