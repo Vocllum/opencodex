@@ -164,21 +164,18 @@ ocx usage --range today --provider xai
 
 ### `ocx storage usage-limit`
 
-Inspect or change the opt-in `usage.jsonl` size ceiling, or start an explicit compaction run.
-The setting is also available in the dashboard under **Storage → Usage history**.
+Inspect or change the opt-in `usage.jsonl` size ceiling. The setting is also available in the
+dashboard on the **Usage** page.
 
 ```bash
 ocx storage usage-limit show --json
 ocx storage usage-limit set --enabled true --mib 512 --json
-ocx storage usage-limit run --yes --json
 ```
 
 `set` sends only the fields supplied, so changing `--mib` preserves the saved enabled state.
 The minimum ceiling is 1 MiB. A bare `usage-limit` invocation is read-only. The background
-scheduler compacts complete JSONL rows after the ledger exceeds the configured ceiling; `run`
-requests an immediate compaction and requires `--yes` because older usage rows are permanently
-removed. The command drives `GET`/`PUT /api/storage/usage-ledger-retention` and
-`POST /api/storage/usage-ledger-retention/run` on the running proxy.
+scheduler compacts complete JSONL rows after the ledger exceeds the configured ceiling. The
+command drives `GET`/`PUT /api/storage/usage-ledger-retention` on the running proxy.
 
 ### `ocx debug <provider|usage|injection|claude> <on|off|status|reset|logs [-f]>`
 

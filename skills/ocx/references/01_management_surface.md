@@ -585,26 +585,24 @@ JSON mode: `payload`.
 
 ### `ocx storage usage-limit`
 
-Show, change, or run the usage-history size limit.
+Show or change the usage-history size limit.
 
 | Method | Route |
 |---|---|
 | GET | `/api/storage/usage-ledger-retention` |
 | PUT | `/api/storage/usage-ledger-retention` |
-| POST | `/api/storage/usage-ledger-retention/run` |
 
 | Flag | Value | Meaning |
 |---|---|---|
 | `--enabled` | string | true or false. |
 | `--mib` | number | Maximum usage-ledger size in MiB; minimum 1. |
-| `--yes` | boolean | Required for `usage-limit run`, which permanently removes older history. |
-| `--json` | boolean | Emit the policy, status, or run state as JSON. |
+| `--json` | boolean | Emit the policy or status as JSON. |
 
 JSON mode: `payload`.
 
 - The limit is opt-in; a bare invocation only reads status.
 - Changing the MiB value without `--enabled` preserves the saved enabled state.
-- A manual run permanently removes older usage rows, so it requires `--yes`.
+- Oversized ledgers are compacted by the automatic scheduler after the limit is enabled.
 
 ### `ocx system codex-restart`
 

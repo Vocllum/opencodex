@@ -119,13 +119,16 @@ one with 409. The CLI handles that for you — it always previews first.
 The status response is the management payload:
 
 ```json
-{"enabled":false,"maxBytes":536870912,"currentBytes":67108864,"overLimit":false,"job":{"status":"idle"}}
+{"enabled":false,"maxBytes":134217728,"currentBytes":67108864,"overLimit":false,"job":{"status":"idle"}}
 ```
 
+The default policy is Unlimited (`enabled:false`); `maxBytes` is the saved ceiling that becomes
+effective only after enabling retention.
+
 `set` returns the same fields with `ok: true`; it merges only the fields supplied by
-`--enabled` and `--mib`. `run --yes` returns `{ "ok": true, "started": true, ... }` with HTTP
-202 when a Worker is queued. A disabled policy or an already-running Worker is a named 409, not
-an indication that the ledger was changed.
+`--enabled` and `--mib`. Oversized ledgers are compacted by the automatic scheduler after the
+limit is enabled; there is no manual run response. The `job` field reports the scheduler's
+process-local status and latest outcome.
 
 ## Error shape
 

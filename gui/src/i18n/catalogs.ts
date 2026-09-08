@@ -8,27 +8,22 @@ import { ru } from "./ru";
 import { ja } from "./ja";
 import { tr } from "./tr";
 import { LAB_CATALOG_OVERRIDES, type LabLocale } from "./lab-translations";
-import {
-  USAGE_RETENTION_CATALOG_OVERRIDES,
-  type UsageRetentionCatalogKey,
-} from "./usage-retention-translations";
 
 /** React-free locale catalog registry for formatters and other shared helpers. */
 export type Locale = LabLocale;
-export type TKey = BaseTKey | UsageRetentionCatalogKey;
+export type TKey = BaseTKey;
 
-/** Apply centrally maintained closed-surface translations to one base locale catalog. */
+/** Apply the centrally maintained Lab closed-surface translations to one base locale catalog. */
 function withCatalogOverlays(locale: Locale, catalog: Record<BaseTKey, string>): Record<TKey, string> {
   return {
     ...catalog,
     ...LAB_CATALOG_OVERRIDES[locale],
-    ...USAGE_RETENTION_CATALOG_OVERRIDES[locale],
   };
 }
 
 /**
- * Closed-surface translations are overlaid centrally so specialized panels cannot regress to
- * copied English values. Base locale parity remains compile-checked by the locale modules.
+ * Lab translations are overlaid centrally so the compatibility surface cannot regress to copied
+ * English values. Base locale parity remains compile-checked by the locale modules.
  */
 export const DICTS: Record<Locale, Record<TKey, string>> = {
   en: withCatalogOverlays("en", en),

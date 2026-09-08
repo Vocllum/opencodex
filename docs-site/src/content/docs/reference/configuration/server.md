@@ -232,16 +232,15 @@ the file exceeds the configured limit; normal request handling is not blocked by
 ```json
 {
   "usageLedgerRetention": {
-    "enabled": true,
-    "maxBytes": 536870912
+    "enabled": false
   }
 }
 ```
 
-`maxBytes` defaults to 512 MiB when omitted and must be a safe integer of at least 1 MiB
-(`1048576`). The saved ceiling is retained when `enabled` is set to `false`, so an operator can
-pause retention without losing the selected limit. Unknown keys and malformed values fail closed
-and leave retention disabled.
+The default is **Unlimited** (`enabled: false`). To enable a ceiling, set `enabled: true` together
+with `maxBytes`; it must be a safe integer of at least 1 MiB (`1048576`). A saved ceiling is
+retained when `enabled` is set to `false`, so an operator can pause retention without losing the
+selected limit. Unknown keys and malformed values fail closed and leave retention disabled.
 
 Compaction publishes a complete JSONL-row candidate only after the source revision and active-turn
 checks still match. An unterminated crash tail is discarded; a single row larger than the ceiling
@@ -249,9 +248,9 @@ is dropped so the published ledger remains bounded. The derived request-history 
 recreated after a successful publish. A policy change invalidates an in-flight candidate, and a
 source append during scanning defers the commit for a later run.
 
-The dashboard exposes the same status under **Storage → Usage history**. For headless operation,
-use `ocx storage usage-limit` or the management routes below. Setting the policy is non-destructive;
-only an explicit manual run removes older rows.
+The dashboard exposes this control on the **Usage** page. For headless operation, use
+`ocx storage usage-limit` or the `GET`/`PUT` management routes below. Setting the policy is
+non-destructive; the background scheduler compacts older rows when the ceiling is exceeded.
 
 ## Quota-reset notifications (`quotaResetNotify`)
 

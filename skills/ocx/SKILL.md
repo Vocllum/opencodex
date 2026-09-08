@@ -113,7 +113,7 @@ but still require authority for their state changes. Follow
 
 ## Destructive verbs
 
-`storage trash restore`, `storage policy run`, and `storage usage-limit run` refuse without `--yes` (exit 2, nothing sent).
+`storage trash restore` and `storage policy run` refuse without `--yes` (exit 2, nothing sent).
 `storage cleanup` without `--yes` is a preview that exits 0 having mutated nothing — do not treat
 that 0 as a delete. There is no interactive prompt.
 

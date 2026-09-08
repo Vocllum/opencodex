@@ -399,24 +399,22 @@ export const CAPABILITIES: readonly Capability[] = [
   },
   {
     command: ["storage", "usage-limit"],
-    summary: "Show, change, or run the usage-history size limit.",
+    summary: "Show or change the usage-history size limit.",
     routes: [
       { method: "GET", path: "/api/storage/usage-ledger-retention" },
       { method: "PUT", path: "/api/storage/usage-ledger-retention" },
-      { method: "POST", path: "/api/storage/usage-ledger-retention/run" },
     ],
     flags: [
       { name: "--enabled", value: "string", summary: "true or false." },
       { name: "--mib", value: "number", summary: "Maximum usage-ledger size in MiB; minimum 1." },
-      { name: "--yes", value: "boolean", summary: "Required for `usage-limit run`, which permanently removes older history." },
-      { name: "--json", value: "boolean", summary: "Emit the policy, status, or run state as JSON." },
+      { name: "--json", value: "boolean", summary: "Emit the policy or status as JSON." },
     ],
     mutates: true,
     json: "payload",
     details: [
       "The limit is opt-in; a bare invocation only reads status.",
       "Changing the MiB value without `--enabled` preserves the saved enabled state.",
-      "A manual run permanently removes older usage rows, so it requires `--yes`.",
+      "Oversized ledgers are compacted by the automatic scheduler after the limit is enabled.",
     ],
   },
   {

@@ -352,16 +352,6 @@ export function requestUsageLedgerRetentionRun():
   return { accepted: true, state: getUsageLedgerRetentionJobState() };
 }
 
-/** Cheap scheduler entry: disabled policies never reserve a Worker. */
-export function maybeRequestUsageLedgerRetentionRun(): void {
-  try {
-    if (!readUsageLedgerRetentionFromConfig().enabled) return;
-    requestUsageLedgerRetentionRun();
-  } catch {
-    warnRetentionFailure();
-  }
-}
-
 /** Join an active retention Worker during final server teardown. */
 export async function abortUsageLedgerRetentionJobAsync(): Promise<void> {
   runGeneration += 1;

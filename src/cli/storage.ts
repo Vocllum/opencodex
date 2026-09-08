@@ -11,8 +11,8 @@
  * 3. **`--json` on the preview emits the candidate list**, so an agent can decide from data
  *    rather than from a sentence.
  *
- * Usage-limit policy writes are non-destructive; only `usage-limit run` immediately removes
- * older history and therefore carries the same explicit `--yes` boundary.
+ * Usage-limit policy writes are non-destructive; oversized ledgers are compacted by the
+ * automatic scheduler after the limit is enabled.
  */
 import {
   CliUsageError,
@@ -40,9 +40,8 @@ const USAGE = `Usage:
   ocx storage policy run [--yes] [--json]
   ocx storage usage-limit [show] [--json]
   ocx storage usage-limit set [--enabled <true|false>] [--mib <N>] [--json]
-  ocx storage usage-limit run [--yes] [--json]
 
-Cleanup, restore, and usage-limit run MUTATE operator data and require --yes where noted.
+Cleanup, restore, and policy run MUTATE operator data and require --yes where noted.
 Without --yes, cleanup prints the preview and changes nothing.`;
 
 /** The digest binds a run to the preview it was authorized against. */
@@ -224,7 +223,7 @@ async function policy(argv: string[], deps: RuntimeApiDeps): Promise<void> {
   printData(result, wantsJson, summaryLines(result));
 }
 
-/** Show or edit the usage-history ceiling; only `run` performs immediate deletion. */
+/** Show or edit the usage-history ceiling; enforcement is performed by the scheduler. */
 async function usageLimit(argv: string[], deps: RuntimeApiDeps): Promise<void> {
   const action = argv[0] && !argv[0].startsWith("-") ? argv[0] : "show";
   const rest = argv[0] && !argv[0].startsWith("-") ? argv.slice(1) : argv;
@@ -267,16 +266,7 @@ async function usageLimit(argv: string[], deps: RuntimeApiDeps): Promise<void> {
     return;
   }
 
-  if (action !== "run") throw new CliUsageError(`unknown usage-limit action ${action}`, USAGE);
-  const args = [...rest];
-  const wantsJson = takeFlag(args, "--json");
-  const confirmed = takeFlag(args, "--yes");
-  rejectArgs(args, USAGE);
-  if (!confirmed) {
-    throw new CliUsageError("usage-limit run permanently removes older usage history; pass --yes to confirm", USAGE);
-  }
-  const result = await runtimeRequest("/api/storage/usage-ledger-retention/run", { method: "POST" }, deps);
-  printData(result, wantsJson, summaryLines(result));
+  throw new CliUsageError(`unknown usage-limit action ${action}`, USAGE);
 }
 
 /** Dispatch `ocx storage` while preserving explicit confirmation boundaries for mutations. */

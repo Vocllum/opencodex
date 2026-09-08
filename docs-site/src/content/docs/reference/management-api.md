@@ -186,7 +186,6 @@ by the current window size.
 | `GET /api/storage` | Scan Codex storage usage by bucket | Returns an `error: "scan_failed"` payload on scan failure |
 | `GET /api/storage/usage-ledger-retention` | Read the usage-ledger retention policy, current `usage.jsonl` size, over-limit state, and the last background job state | — |
 | `PUT /api/storage/usage-ledger-retention` | Replace the retention fields supplied in `{ "enabled"?: boolean, "maxBytes"?: integer }`; omitted fields keep their saved values | 400 malformed body, unknown field, or `maxBytes` below 1 MiB; 500 `config_write_failed` |
-| `POST /api/storage/usage-ledger-retention/run` | Start one immediate compaction when the policy is enabled | 202 `{ "ok": true, "started": true }`; 409 `retention_disabled` or `already_running` |
 | `POST /api/storage/cleanup/preview` | Preview archived-session cleanup and return a binding digest | 400 `invalid_json` or `invalid_percent` |
 | `POST /api/storage/cleanup` | Quarantine or permanently remove the previewed archived set | 400 invalid input; 409 stale/busy/referenced state; 500 filesystem/database failure |
 | `GET /api/storage/trash` | List quarantined cleanup entries | 500 `trash_list_failed` |
@@ -199,10 +198,9 @@ by the current window size.
 The retention status response is shaped as `{ enabled, maxBytes, currentBytes, overLimit, job }`;
 `job` reports the process-local background state (`idle` or `running`) and the last outcome when
 one exists. `PUT` accepts only `enabled` and `maxBytes`, and merges the supplied fields with the
-saved policy. It never starts a compaction by itself. A successful `POST .../run` queues a Worker
-and returns `202`; the canonical ledger is replaced only after complete-row, active-turn, and
-source-revision checks pass. If the policy is disabled, or another run already owns the Worker,
-the route returns `409` without changing the ledger.
+saved policy. It never starts a compaction by itself. The background scheduler queues a Worker
+when the ledger exceeds the ceiling; the canonical ledger is replaced only after complete-row,
+active-turn, and source-revision checks pass.
 
 New xAI attempts in `usage.jsonl` include a request-time `credentialSource`: `grok-oauth`
 for the resolved Grok CLI OAuth transport, or `xai-api-key` for the public xAI API key

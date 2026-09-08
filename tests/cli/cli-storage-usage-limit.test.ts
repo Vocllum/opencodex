@@ -29,7 +29,7 @@ function capture(): { restore: () => void } {
 
 const STATUS = {
   enabled: false,
-  maxBytes: 512 * 1024 * 1024,
+  maxBytes: 128 * 1024 * 1024,
   currentBytes: 64 * 1024 * 1024,
   overLimit: false,
   job: { status: "idle" },
@@ -87,7 +87,7 @@ describe("ocx storage usage-limit", () => {
     expect(calls).toHaveLength(0);
   });
 
-  test("manual run requires --yes and sends no mutation without it", async () => {
+  test("manual run is no longer exposed", async () => {
     const { calls, deps } = harness(() => ({ json: { ok: true, started: true } }));
     const cap = capture();
     let code: number;
@@ -98,16 +98,5 @@ describe("ocx storage usage-limit", () => {
     }
     expect(code).not.toBe(0);
     expect(calls).toHaveLength(0);
-  });
-
-  test("manual run with --yes reaches the destructive route", async () => {
-    const { calls, deps } = harness(() => ({ json: { ok: true, started: true } }));
-    const cap = capture();
-    try {
-      expect(await handleStorageCommand(["usage-limit", "run", "--yes"], deps)).toBe(0);
-    } finally {
-      cap.restore();
-    }
-    expect(calls).toEqual([{ method: "POST", path: "/api/storage/usage-ledger-retention/run", body: undefined }]);
   });
 });

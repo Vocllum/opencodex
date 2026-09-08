@@ -221,9 +221,8 @@ ocx storage usage-limit show --json
 ocx storage usage-limit set --enabled true --mib 512 --json
 ```
 
-The scheduler compacts complete `usage.jsonl` rows in the background once `maxBytes` is exceeded.
-To request an immediate compaction, use `ocx storage usage-limit run --yes --json`; it permanently
-removes older usage rows and refuses without the explicit confirmation flag.
+Changing the ceiling is non-destructive. The scheduler compacts complete `usage.jsonl` rows in the
+background once `maxBytes` is exceeded; there is no manual compaction command.
 
 ## 9. Read Muse Code usage, and know why it can be old
 

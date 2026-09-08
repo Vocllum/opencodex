@@ -272,7 +272,7 @@ export const CLI_COMMANDS: CliCommandEntry[] = [
     details: [
       "A bare `ocx storage` prints the report, as it did when this was an alias of `observe storage`.",
       "`cleanup` previews by default and only deletes under --yes; `trash restore` and `policy run` also require --yes.",
-      "`usage-limit` shows or changes the opt-in usage-history ceiling; `usage-limit run` requires --yes.",
+      "`usage-limit` shows or changes the opt-in usage-history ceiling; oversized ledgers are compacted by the automatic scheduler.",
     ],
   },
   { name: "memory", usage: "ocx memory [--json]", summary: "Alias of ocx observe memory." },

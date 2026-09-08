@@ -21,7 +21,6 @@ import {
 import {
   getUsageLedgerRetentionJobState,
   invalidateUsageLedgerRetentionRun,
-  requestUsageLedgerRetentionRun,
 } from "../../usage/ledger-retention-job";
 import { jsonResponse } from "../auth-cors";
 import {
@@ -152,7 +151,7 @@ export async function handleStorageLogGuardRoutes(ctx: ManagementContext): Promi
       // The old preparation may finish, but its generation can no longer commit.
       invalidateUsageLedgerRetentionRun();
       // PUT changes policy only. Automatic enforcement belongs to the scheduler;
-      // the explicit /run route is the operator's immediate destructive action.
+      // there is no public manual trigger for destructive compaction.
       return jsonResponse({
         ok: true,
         ...getUsageLedgerRetentionStatus(config),
@@ -161,33 +160,6 @@ export async function handleStorageLogGuardRoutes(ctx: ManagementContext): Promi
     } catch {
       return jsonResponse({ error: "config_write_failed" }, 500, req, config);
     }
-  }
-
-  if (url.pathname === "/api/storage/usage-ledger-retention/run" && req.method === "POST") {
-    const status = getUsageLedgerRetentionStatus(config);
-    if (!status.enabled) {
-      return jsonResponse({
-        ok: false,
-        error: "retention_disabled",
-        ...status,
-        job: getUsageLedgerRetentionJobState(),
-      }, 409, req, config);
-    }
-    const run = requestUsageLedgerRetentionRun();
-    if (!run.accepted) {
-      return jsonResponse({
-        ok: false,
-        error: "already_running",
-        ...status,
-        job: run.state,
-      }, 409, req, config);
-    }
-    return jsonResponse({
-      ok: true,
-      started: true,
-      ...status,
-      job: run.state,
-    }, 202, req, config);
   }
 
   if (url.pathname === "/api/storage/codex-logs") {
