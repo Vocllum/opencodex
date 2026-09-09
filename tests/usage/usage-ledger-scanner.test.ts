@@ -274,7 +274,7 @@ describe("usage ledger cooperative scanner", () => {
 
   test("a torn EOF keeps the checkpoint behind it and is counted once after completion", async () => {
     const committed = line("committed");
-    const completedRow = Buffer.from(JSON.stringify(entry("완成-🙂")));
+    const completedRow = Buffer.from(JSON.stringify(entry("완성-🙂")));
     const splitAt = completedRow.indexOf(Buffer.from("🙂")) + 2;
     writeFileSync(usageLogPath(), Buffer.concat([
       Buffer.from(committed),
@@ -304,7 +304,7 @@ describe("usage ledger cooperative scanner", () => {
       expectedProcessedThroughDigest: first.processedThroughDigest,
       onEntry: value => completedIds.push(value.requestId),
     });
-    expect(completedIds).toEqual(["완成-🙂"]);
+    expect(completedIds).toEqual(["완성-🙂"]);
     expect(second.invalidRows).toBe(0);
 
     const afterIds: string[] = [];
