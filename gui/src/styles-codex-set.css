@@ -457,3 +457,21 @@
   border-radius: var(--radius);
   box-shadow: 0 4px 24px rgb(0 0 0 / 0.14);
 }
+
+/* Layout ownership lives here too. The type-qualified selectors outrank the legacy
+   single-class declarations later in styles.css, so the disclosure stays out of card flow
+   even after styles.css is refreshed from upstream. */
+details.codex-account-more {
+  position: relative;
+  display: inline-block;
+}
+
+details.codex-account-more > .codex-account-more-body {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  flex-basis: auto;
+}
