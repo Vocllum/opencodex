@@ -1015,6 +1015,7 @@ export async function handleResponsesCompact(
             upstream.headers,
             authCtx.writerGeneration,
             authCtx.kind === "main-pool" ? authCtx.mainQuotaWriter : undefined,
+            { modelId: route.modelId },
           );
         }
         recordCompactPoolOutcome(authCtx, upstream.status, {
