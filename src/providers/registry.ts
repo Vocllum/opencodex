@@ -175,6 +175,13 @@ export interface ProviderRegistryEntry {
   staticHeaders?: Record<string, string>;
   modelSuffixBracketStrip?: boolean;
   featured?: boolean;
+  /**
+   * Paid provider sponsorship under SPONSORS.md. `main` is reserved for model developers,
+   * `standard` for relays and gateways. The picker pins sponsor rows first (alphabetical among
+   * themselves) and labels them; nothing else reads this field. Routing, failover, quota, and
+   * defaults never consult it — that boundary is what SPONSORS.md promises users.
+   */
+  sponsor?: { tier: "main" | "standard"; url: string };
   dashboardPreset?: boolean;
   note?: string;
   dashboardUrl?: string;
@@ -1918,6 +1925,9 @@ export const PROVIDER_REGISTRY: readonly ProviderRegistryEntry[] = [
     authKind: "key", dashboardUrl: "https://www.orcarouter.ai/console",
     // The catalog is public, so a successful /models probe cannot validate a submitted key.
     apiKeyValidation: "unknown",
+    // Standard sponsor under SPONSORS.md (agreement signed 2026-09-07). Pins the row in the
+    // picker and adds the chip; nothing about routing or defaults changes.
+    sponsor: { tier: "standard", url: "https://www.orcarouter.ai/?utm_source=opencodex&utm_medium=readme" },
     defaultModel: "openai/gpt-5.5",
     models: ORCAROUTER_MODELS,
     liveModels: true,

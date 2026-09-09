@@ -6,6 +6,13 @@ description: Every way opencodex authenticates and talks to an LLM provider — 
 A **provider** is one upstream LLM endpoint plus how to reach it: an adapter, a base URL, an auth
 mode, and an optional model list. Providers live under `providers` in `~/.opencodex/config.json`.
 
+The dashboard provider Overview separates connection details, account usage and editable notes.
+Notes appear once, below the connection and authentication sections. Supported sponsor presets
+also show a short introduction, a Sponsor label and links to the provider's site or console.
+These links preserve the preset's referral parameters. Sponsor information is shown only when
+the configured provider name, adapter and endpoint match the preset; it never changes routing,
+account selection or defaults.
+
 ## OpenAI account modes
 
 | Provider id | Use | Credential/account rule |
@@ -332,6 +339,13 @@ preserves those requested tiers; any backend-specific normalization remains Clin
 (OpenRouter-style ids like `anthropic/claude-sonnet-4-6`). Cline's promotional free models are only
 available in the Cline IDE/CLI, not through the API; `minimax/minimax-m2.5` is the documented API
 free-experimentation model.
+
+**OrcaRouter** ([sponsor](https://github.com/lidge-jun/opencodex/blob/main/SPONSORS.md)) is an
+OpenAI-compatible gateway at `https://api.orcarouter.ai/v1` with vendor-namespaced model ids
+(`openai/gpt-5.5`, `anthropic/claude-opus-4.8`, `deepseek/deepseek-v4-pro`, ...) and an adaptive
+router, `orcarouter/auto`, that grades each prompt and picks the model. Create a key in the
+[OrcaRouter console](https://www.orcarouter.ai/console); the preset pins the row near the top of the
+Add provider picker and marks it as a sponsor, and nothing else about routing or defaults changes.
 
 | Provider | Base URL |
 | --- | --- |
