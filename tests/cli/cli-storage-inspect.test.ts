@@ -47,10 +47,8 @@ describe("ocx storage cleanup", () => {
     try { code = await handleStorageCommand(["cleanup", "--percent", "25"], deps); } finally { cap.restore(); }
 
     expect(code).toBe(0);
-    // Exactly one call, and it is the preview.
     expect(calls).toHaveLength(1);
     expect(calls[0]?.path).toBe("/api/storage/cleanup/preview");
-    // The assertion that matters: the deleting route was never touched.
     expect(calls.some(c => c.path === "/api/storage/cleanup")).toBe(false);
     expect(cap.out.join("\n")).toContain("Nothing was deleted");
     expect(cap.out.join("\n")).toContain("archived_sessions/a.jsonl");
@@ -66,8 +64,6 @@ describe("ocx storage cleanup", () => {
 
     expect(code).toBe(0);
     expect(calls.map(c => c.path)).toEqual(["/api/storage/cleanup/preview", "/api/storage/cleanup"]);
-    // The digest binds the run to the preview it was authorized against; the server rejects a
-    // stale one with 409, so forwarding it is not optional politeness.
     expect(calls[1]?.body).toEqual({ percent: 25, mode: "quarantine", digest: "digest-abc" });
   });
 
@@ -140,18 +136,10 @@ describe("ocx storage trash and policy", () => {
     const cap = capture();
     try { await handleStorageCommand(["policy", "set", "--percent", "40"], deps); } finally { cap.restore(); }
     expect(calls[0]?.method).toBe("PUT");
-    // `enabled` is absent, which the server reads as "keep the stored value". Sending
-    // `enabled: false` here would silently disable a policy the operator never mentioned.
-    // The percent travels inside `target`: the PUT contract has no top-level `percent`, so
-    // that shape was accepted, dropped, and left the stored target in place.
     expect(calls[0]?.body).toEqual({ target: { removeOldestPercent: 40 } });
   });
 
   test("--percent reaches the server in the shape the policy target actually reads", async () => {
-    // A top-level `percent` round-trips as HTTP 200 while changing nothing:
-    // `normalizeStorageCleanupPolicy` reads only `target`, so a policy still holding the
-    // default 25% stayed at 25% after `--percent 10` reported success — cleanup remained
-    // authorized to delete more than the operator asked for.
     const { calls, deps } = harness(() => ({ json: { ok: true, policy: {} } }));
     const cap = capture();
     try { await handleStorageCommand(["policy", "set", "--percent", "10"], deps); } finally { cap.restore(); }
@@ -161,8 +149,6 @@ describe("ocx storage trash and policy", () => {
   });
 
   test("an out-of-range percent is still sent so the server can name the rejection", async () => {
-    // Rejecting locally would duplicate the server's 1-100 vocabulary. A named 400 is a
-    // refused write; the defect being fixed here was a silent accepted one.
     const { calls, deps } = harness(() => ({ json: { ok: true, policy: {} } }));
     const cap = capture();
     try { await handleStorageCommand(["policy", "set", "--percent", "0"], deps); } finally { cap.restore(); }
@@ -181,8 +167,6 @@ describe("ocx storage trash and policy", () => {
 
 describe("ocx storage keeps its old meaning", () => {
   test("a bare invocation and a leading flag both read the report", async () => {
-    // `ocx storage` and `ocx storage --json` were an alias of `observe storage` before this
-    // module existed. A leading flag must not be parsed as a subcommand name.
     for (const argv of [[], ["--json"]]) {
       const { calls, deps } = harness(() => ({ json: { codexHome: "/tmp", total: { bytes: 1 } } }));
       const cap = capture();
@@ -194,9 +178,6 @@ describe("ocx storage keeps its old meaning", () => {
   });
 
   test("codex-logs still reaches the log-guard route", async () => {
-    // Doctor and the published Log Guard guides still tell the operator to run
-    // `ocx storage codex-logs repair`. Treating that as an unknown subcommand
-    // would make the documented recovery path exit 2.
     const { calls, deps } = harness(() => ({ json: { ok: true } }));
     const cap = capture();
     let code: number;
@@ -213,7 +194,6 @@ describe("ocx inspect", () => {
     try { await handleInspectCommand(["star"], deps); } finally { cap.restore(); }
     expect(calls).toHaveLength(1);
     expect(calls[0]?.method).toBe("GET");
-    // No POST, ever: it spends the operator GitHub identity and requires a dashboard session.
     expect(calls.every(c => c.method === "GET")).toBe(true);
     expect(cap.out.join("\n")).toContain("only you can do it");
   });
@@ -255,8 +235,6 @@ describe("ocx integration native", () => {
   ] };
 
   test("the list renders per-client state instead of an item count", async () => {
-    // The shared flattener rendered this array as `clients: 2 item(s)`, discarding every
-    // column the operator asked for.
     const { deps } = harness(() => ({ json: CLIENTS }));
     const cap = capture();
     try { await handleIntegrationCommand(["native", "list"], deps); } finally { cap.restore(); }
@@ -265,7 +243,6 @@ describe("ocx integration native", () => {
     expect(out).toContain("claude");
     expect(out).toContain("grok");
     expect(out).toContain("stale");
-    // A blocked disable explains why a toggle did not take effect, so it is never dropped.
     expect(out).toContain("disable blocked: in use");
   });
 
@@ -289,5 +266,79 @@ describe("ocx integration native", () => {
       expect(code).not.toBe(0);
       expect(calls).toHaveLength(0);
     }
+  });
+});
+
+const RETENTION_STATUS = {
+  enabled: false,
+  maxBytes: 128 * 1024 * 1024,
+  currentBytes: 64 * 1024 * 1024,
+  overLimit: false,
+  job: { status: "idle" },
+};
+
+describe("ocx storage usage-limit", () => {
+  test("show reads the usage-ledger retention status", async () => {
+    const { calls, deps } = harness(() => ({ json: RETENTION_STATUS }));
+    const cap = capture();
+    try {
+      expect(await handleStorageCommand(["usage-limit", "show"], deps)).toBe(0);
+    } finally {
+      cap.restore();
+    }
+    expect(calls).toEqual([{ method: "GET", path: "/api/storage/usage-ledger-retention", body: undefined }]);
+  });
+
+  test("set sends only the fields explicitly given", async () => {
+    const { calls, deps } = harness(() => ({ json: { ok: true, ...RETENTION_STATUS } }));
+    const cap = capture();
+    try {
+      expect(await handleStorageCommand(["usage-limit", "set", "--mib", "1024"], deps)).toBe(0);
+    } finally {
+      cap.restore();
+    }
+    expect(calls[0]).toMatchObject({
+      method: "PUT",
+      path: "/api/storage/usage-ledger-retention",
+      body: { maxBytes: 1024 * 1024 * 1024 },
+    });
+    expect(calls[0]?.body).not.toHaveProperty("enabled");
+  });
+
+  test("set can explicitly enable without changing the saved ceiling", async () => {
+    const { calls, deps } = harness(() => ({ json: { ok: true, ...RETENTION_STATUS, enabled: true } }));
+    const cap = capture();
+    try {
+      expect(await handleStorageCommand(["usage-limit", "set", "--enabled", "true"], deps)).toBe(0);
+    } finally {
+      cap.restore();
+    }
+    expect(calls[0]?.body).toEqual({ enabled: true });
+  });
+
+  test("set with no fields is rejected locally", async () => {
+    const { calls, deps } = harness(() => ({ json: RETENTION_STATUS }));
+    const cap = capture();
+    let code: number;
+    try {
+      code = await handleStorageCommand(["usage-limit", "set"], deps);
+    } finally {
+      cap.restore();
+    }
+    expect(code).not.toBe(0);
+    expect(calls).toHaveLength(0);
+  });
+
+  test("manual run is no longer exposed", async () => {
+    const { calls, deps } = harness(() => ({ json: { ok: true, started: true } }));
+    const cap = capture();
+    let code: number;
+    try {
+      code = await handleStorageCommand(["usage-limit", "run"], deps);
+    } finally {
+      cap.restore();
+    }
+    expect(code).not.toBe(0);
+    expect(calls).toHaveLength(0);
   });
 });
