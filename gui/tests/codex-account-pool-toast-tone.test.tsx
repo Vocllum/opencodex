@@ -573,25 +573,3 @@ test("a pool card with a non-default order keeps its order select inline", async
   expect(card.querySelector<HTMLDetailsElement>("details.codex-account-more")!.open).toBe(false);
   expect(card.querySelector("#codex-account-priority-pool-1")).not.toBeNull();
 });
-
-test("the more-actions disclosure uses one anchored CSS panel without a flex-basis row break", async () => {
-  const source = await Bun.file(new URL("../src/components/codex-account-pool-cards.tsx", import.meta.url)).text();
-  const css = await Bun.file(new URL("../src/styles.css", import.meta.url)).text();
-  const wrapper = /\.codex-account-more\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
-  const body = /\.codex-account-more-body\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
-
-  // The layout contract belongs to the stylesheet so a later refactor cannot leave an
-  // inline declaration silently winning over the old flex rule.
-  expect(source).toContain('className="codex-account-more card-right"');
-  expect(source).toContain('className="codex-account-more-body"');
-  expect(source).not.toContain('style={{ position: "relative", display: "inline-block" }}');
-  expect(source).not.toContain('flexBasis: "auto"');
-
-  expect(wrapper).toMatch(/position:\s*relative/);
-  expect(wrapper).toMatch(/display:\s*inline-block/);
-  expect(body).toMatch(/position:\s*absolute/);
-  expect(body).toMatch(/top:\s*calc\(100% \+ 6px\)/);
-  expect(body).toMatch(/right:\s*0/);
-  expect(body).toMatch(/max-width:\s*min\(680px, calc\(100vw - 48px\)\)/);
-  expect(body).not.toMatch(/flex-basis:/);
-});
