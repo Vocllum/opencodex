@@ -76,6 +76,8 @@ describe("i18n locale contracts", () => {
       "usage.retention.enabled",
       "usage.retention.current",
       "usage.retention.limit",
+      "usage.retention.increase",
+      "usage.retention.decrease",
       "usage.retention.unlimited",
       "usage.retention.error",
       "usage.retention.disabled",
