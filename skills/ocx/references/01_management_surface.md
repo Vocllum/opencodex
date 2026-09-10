@@ -177,6 +177,7 @@ Disk usage under CODEX_HOME, with the log-guard protection report.
 | Method | Route |
 |---|---|
 | GET | `/api/storage` |
+
 | Flag | Value | Meaning |
 |---|---|---|
 | `--json` | boolean | Emit the storage report as JSON. |
@@ -536,6 +537,7 @@ Show or set how many consecutive requests stay on one account.
 JSON mode: `envelope`.
 
 - Only meaningful under the sticky-capable strategies; the pool strategy is the other half of this setting.
+
 ### `ocx storage cleanup`
 
 Preview or delete the oldest archived sessions by percentage.
