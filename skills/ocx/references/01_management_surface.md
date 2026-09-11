@@ -208,7 +208,7 @@ The generated model catalog served to clients.
 
 | Flag | Value | Meaning |
 |---|---|---|
-| `--json` | boolean | Emit the catalog as JSON. |
+| `--json` | boolean | Emit the catalog payload as JSON. |
 
 JSON mode: `payload`.
 
@@ -749,6 +749,6 @@ JSON mode: `payload`.
 
 ## Counts
 
-- declared capabilities: 39
-- of those, state-changing: 18
+- declared capabilities: 40
+- of those, state-changing: 19
 - head-resolved invocations: 2
