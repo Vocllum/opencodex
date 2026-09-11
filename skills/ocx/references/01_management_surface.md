@@ -208,7 +208,7 @@ The generated model catalog served to clients.
 
 | Flag | Value | Meaning |
 |---|---|---|
-| `--json` | boolean | Emit the catalog payload as JSON. |
+| `--json` | boolean | Emit the catalog as JSON. |
 
 JSON mode: `payload`.
 
