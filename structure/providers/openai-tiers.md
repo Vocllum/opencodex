@@ -92,6 +92,18 @@ requests keep their captured credential. An all-paused pool fails closed.
 The dashboard's bulk pause action refreshes all account quotas and mutates only accounts whose
 plan-relevant window is freshly confirmed at exactly 100%; unknown and failed refreshes are skipped.
 
+A quota refusal that announces a reset carries two durations, not one. The hard cooldown governs
+blocking and keeps its cap, and a separate avoidance window records the period the refusal actually
+announced, bounded at six hours so a reset days out cannot take an account out of rotation for that
+long. Selection and affinity reuse both pass over an account while its window is live. The window
+binds the stable `__main__` alias on the same terms as an added account: the main login is not in
+the configured pool and enters candidacy through its own re-insertion path, which applies the same
+avoidance check the pool filters apply. Avoidance stays soft. Last-resort selection still reaches
+the account when nothing else can serve, a successful recovery probe drops the window with the
+cooldown it belonged to, and both operator escapes remove it: clearing a cooldown and naming an
+account each clear the window from the account-wide entry and from every scoped entry, because a
+reset-derived refusal records only the scoped one.
+
 A confirmed manual reset-credit consumption may immediately reconcile that account's
 eligible pre-existing ordinary reset-derived cooldown after a complete, non-exhausted usage
 observation started after the reset. Paused or reauthentication-required accounts and
