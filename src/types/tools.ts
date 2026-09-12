@@ -13,7 +13,7 @@ export interface OcxTool {
   loadedFromToolSearch?: boolean;
   /** Cursor-only synthetic exact-match edit tool; never inferred from the wire name. */
   cursorStructuredEdit?: true;
-  /** Synthetic web_search tool: the model's call is executed by the gpt-5.4-mini sidecar, not relayed to Codex. */
+  /** Synthetic web_search tool: the model's call is executed by the gpt-5.6-luna sidecar, not relayed to Codex. */
   webSearch?: boolean;
   /** Synthetic image_gen tool: the model's call is executed by the xAI image bridge sidecar, not relayed to Codex. */
   imageGeneration?: boolean;

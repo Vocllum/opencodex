@@ -11,7 +11,7 @@ import { resolveSidecarAuth } from "../sidecar/auth";
 import { DEFAULT_VISION_TIMEOUT_MS, MAX_VISION_TIMEOUT_MS, MIN_VISION_TIMEOUT_MS } from "./timeout-bounds";
 import { carriesImages } from "./image-rewrite";
 
-const DEFAULT_VISION_MODEL = "gpt-5.4-mini";
+const DEFAULT_VISION_MODEL = "gpt-5.6-luna";
 const DEFAULT_ANTHROPIC_VISION_MODEL = "claude-sonnet-5";
 const DEFAULT_REASONING: VisionReasoningEffort = "low";
 export const DEFAULT_MAX_DESCRIPTIONS_PER_TURN = 8;

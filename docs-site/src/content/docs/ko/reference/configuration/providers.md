@@ -223,7 +223,7 @@ Anthropic 계정 정책 위험을 이해하지 못한다면 이 기능은 꺼두
 | `failureBackoffMaxSeconds?` | `number` | `3600` | backoff 상한이자 영구 실패 지연입니다. |
 | `codexWarmupEnabled?` | `boolean` | `false` | 합성 Codex 풀 계정 검증을 선택적으로 켭니다. |
 | `codexWarmupMaxAgeSeconds?` | `number` | `691200` | 8일 후 계정을 다시 검증합니다. |
-| `codexWarmupModel?` | `string` | `gpt-5.4-mini` | 선택적 워밍업에 쓰는 네이티브 모델입니다. |
+| `codexWarmupModel?` | `string` | `gpt-5.6-luna` | 선택적 워밍업에 쓰는 네이티브 모델입니다. |
 
 ## 고정 공급자 엔드포인트
 

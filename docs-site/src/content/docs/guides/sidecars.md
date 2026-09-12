@@ -132,7 +132,7 @@ Combos advertise image input only when every member accepts images, either nativ
 sidecar, and the combo's `imageInput` setting is not disabled, so clients such as the Codex app
 allow attachments instead of blocking them before the sidecar runs. When
 `visionSidecar.model` is absent or blank, the OpenAI execution path, Dashboard, and management API
-use the `gpt-5.4-mini` fallback. Startup still migrates an explicitly persisted legacy
+use the `gpt-5.6-luna` fallback. Startup still migrates an explicitly persisted legacy
 `gpt-5.4-mini` value to `gpt-5.6-luna`; that migration applies to a stored value, not to an absent
 model field.
 

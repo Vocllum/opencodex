@@ -182,7 +182,7 @@ API-key 供應商可持有字面值金鑰或環境參考。OAuth 供應商使用
 | `failureBackoffMaxSeconds?` | `number` | `3600` | Backoff 上限與永久失敗延遲。 |
 | `codexWarmupEnabled?` | `boolean` | `false` | 選擇加入合成 Codex 池帳號驗證。 |
 | `codexWarmupMaxAgeSeconds?` | `number` | `691200` | 8 天後重新驗證帳號。 |
-| `codexWarmupModel?` | `string` | `gpt-5.4-mini` | 用於可選暖機的原生模型。 |
+| `codexWarmupModel?` | `string` | `gpt-5.6-luna` | 用於可選暖機的原生模型。 |
 
 ## 固定供應商端點
 

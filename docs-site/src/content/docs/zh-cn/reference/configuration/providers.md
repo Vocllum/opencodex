@@ -217,7 +217,7 @@ affinity。这些策略不能规避 provider enforcement。
 | `failureBackoffMaxSeconds?` | `number` | `3600` | 退避上限和永久故障延迟。 |
 | `codexWarmupEnabled?` | `boolean` | `false` | 启用合成的 Codex 池账户验证。 |
 | `codexWarmupMaxAgeSeconds?` | `number` | `691200` | 8 天后重新验证账户。 |
-| `codexWarmupModel?` | `string` | `gpt-5.4-mini` | 用于可选预热的原生模型。 |
+| `codexWarmupModel?` | `string` | `gpt-5.6-luna` | 用于可选预热的原生模型。 |
 
 ## 固定提供者端点
 

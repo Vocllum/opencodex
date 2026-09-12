@@ -253,7 +253,7 @@ Les entrées `codexAccounts[]` exigent `id`, `email` et `isMain` ; `plan`,
 | `failureBackoffMaxSeconds?` | `number` | `3600` | Plafond du délai d'attente et délai après un échec permanent. |
 | `codexWarmupEnabled?` | `boolean` | `false` | Active la validation synthétique des comptes du pool Codex. |
 | `codexWarmupMaxAgeSeconds?` | `number` | `691200` | Revalidez un compte après 8 jours. |
-| `codexWarmupModel?` | `string` | `gpt-5.4-mini` | Modèle natif utilisé pour l'échauffement facultatif. |
+| `codexWarmupModel?` | `string` | `gpt-5.6-luna` | Modèle natif utilisé pour l'échauffement facultatif. |
 
 ## Points de terminaison du fournisseur fixes
 

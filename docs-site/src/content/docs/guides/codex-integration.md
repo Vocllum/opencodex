@@ -706,7 +706,7 @@ Catalog sync makes the selected sub-agent models available to Codex; see [Codex 
 
 ## Codex account warmup
 
-When a ChatGPT account is added or reauthenticated, OpenCodex normally verifies it before saving with a small streaming request to the Codex Responses backend. It waits for `response.completed`, defaults to `gpt-5.4-mini`, and retries with `gpt-5.5` and `gpt-5.6-luna` on HTTP 400 or HTTP 404. Public errors contain fixed failure categories rather than raw upstream response bodies.
+When a ChatGPT account is added or reauthenticated, OpenCodex normally verifies it before saving with a small streaming request to the Codex Responses backend. It waits for `response.completed`, defaults to `gpt-5.6-luna`, and retries with `gpt-5.5` on HTTP 400 or HTTP 404. Public errors contain fixed failure categories rather than raw upstream response bodies.
 
 If the new OAuth credential's authenticated usage lookup confirms an exhausted 5-hour, weekly, or monthly quota, the account is saved without this model request and shows **Validation pending**. It cannot serve pool requests, even after a restart or token refresh. Once quota recovers, **Refresh quotas** finishes validation: a fresh, complete usage reading with headroom permits one small model request, and only a completed response enables the account. Failed or incomplete readings and failed validation preserve the restriction. Passive account polling does not trigger deferred validation. Unknown usage during initial registration retains the normal warmup gate.
 
@@ -728,7 +728,7 @@ A main-account refresh that does not complete still answers `503` with `Retry-Af
 ocx config set codexPool '{"excludedPlans":["free"]}'
 ```
 
-This is a selection policy, not a block. An excluded account keeps its credential, quota history, and thread affinity, stays visible on the account surface, and is still reachable by explicit account selection such as `work/gpt-5.4`. What changes is that automatic rotation stops choosing it, including when it is already the active account or already bound to a thread — which is the state a lapsed subscription leaves behind.
+This is a selection policy, not a block. An excluded account keeps its credential, quota history, and thread affinity, stays visible on the account surface, and is still reachable by explicit account selection such as `work/gpt-5.5`. What changes is that automatic rotation stops choosing it, including when it is already the active account or already bound to a thread — which is the state a lapsed subscription leaves behind.
 
 Two deliberate limits. The main Codex account is never excluded by plan, because selection-only routing withholds its plan rather than reading the fenced native credential, so a rule covering it would disagree with itself. And when no unexcluded account remains, the excluded one still answers rather than failing closed; pausing every account is still the way to stop serving entirely. There is no `minimumPlan` counterpart, because ranking ChatGPT plans against each other needs a total ordering that does not exist here.
 

@@ -375,7 +375,7 @@ délégation v1/base/v2 et de ses mécanismes de repli.
 
 ## Préchauffage des comptes Codex
 
-L’ajout ou la réauthentification vérifie normalement le compte avant son enregistrement par une petite requête attendant `response.completed`. Le modèle par défaut est `gpt-5.4-mini`, avec un essai sur `gpt-5.5` et `gpt-5.6-luna` en cas de HTTP 400 ou HTTP 404. Les erreurs publiques contiennent des catégories fixes, sans corps de réponse brut.
+L’ajout ou la réauthentification vérifie normalement le compte avant son enregistrement par une petite requête attendant `response.completed`. Le modèle par défaut est `gpt-5.6-luna`, avec un essai sur `gpt-5.5` en cas de HTTP 400 ou HTTP 404. Les erreurs publiques contiennent des catégories fixes, sans corps de réponse brut.
 
 Si la lecture authentifiée des quotas avec le nouveau jeton OAuth confirme un quota de 5 heures, hebdomadaire ou mensuel épuisé, le compte est enregistré sans appel au modèle et affiche **Validation en attente**. Il reste exclu du routage après un redémarrage ou un renouvellement du jeton. Après récupération du quota, actualisez les quotas : une lecture récente et complète avec de la capacité disponible permet une petite requête de validation. Seule sa réussite active le compte. Tout échec conserve la restriction. Les lectures passives ne déclenchent pas cette requête. Un quota inconnu à l’inscription conserve la vérification habituelle.
 
@@ -397,7 +397,7 @@ Un renouvellement du compte principal qui n'aboutit pas répond toujours `503` a
 ocx config set codexPool '{"excludedPlans":["free"]}'
 ```
 
-C'est une politique de sélection, pas un blocage. Un compte écarté conserve ses identifiants, son historique de quota et son affinité de thread, reste visible dans la liste des comptes et demeure joignable par sélection explicite comme `work/gpt-5.4`. Seule la rotation automatique cesse de le choisir, y compris lorsqu'il est déjà le compte actif ou déjà lié à un thread — l'état exact que laisse un abonnement expiré.
+C'est une politique de sélection, pas un blocage. Un compte écarté conserve ses identifiants, son historique de quota et son affinité de thread, reste visible dans la liste des comptes et demeure joignable par sélection explicite comme `work/gpt-5.5`. Seule la rotation automatique cesse de le choisir, y compris lorsqu'il est déjà le compte actif ou déjà lié à un thread — l'état exact que laisse un abonnement expiré.
 
 Deux limites volontaires. Le compte Codex principal n'est jamais écarté par forfait, car le routage en mode sélection seule ne lit pas son forfait dans les identifiants natifs protégés ; une règle le couvrant se contredirait. Et lorsqu'il ne reste aucun compte non écarté, le compte écarté répond quand même au lieu d'échouer : mettre tous les comptes en pause reste le moyen d'arrêter complètement le service. Il n'existe pas de `minimumPlan`, car classer les forfaits ChatGPT entre eux exige un ordre total qui n'existe pas ici.
 

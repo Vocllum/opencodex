@@ -40,7 +40,7 @@ const OPENCODE_ENVELOPE_BASE = {
         npm: "@ai-sdk/openai-compatible",
         name: "OpenCodex",
         options: { baseURL: "http://127.0.0.1:10100/v1", apiKey: "{env:OPENCODEX_OPENCODE_API_KEY}" },
-        models: { "gpt-5.4": { name: "gpt-5.4 (native)" } },
+        models: { "gpt-5.5": { name: "gpt-5.5 (native)" } },
       },
     },
   },
@@ -57,7 +57,7 @@ const PI_ENVELOPE_BASE = {
   format: "json",
   mediaType: "application/json",
   // Pi keys its models as an ARRAY — the shape swap is what proves a real refetch.
-  config: { providers: { opencodex: { models: [{ id: "gpt-5.4" }, { id: "claude-sonnet-4-6" }] } } },
+  config: { providers: { opencodex: { models: [{ id: "gpt-5.5" }, { id: "claude-sonnet-4-6" }] } } },
 };
 
 /**

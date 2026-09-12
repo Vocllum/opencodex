@@ -45,6 +45,7 @@ import { migrateZaiResponsesDefault } from "../../src/providers/zai-responses-mi
 import { migrateStartupZaiResponses } from "../../src/server/zai-responses-startup";
 import * as configStore from "../../src/config";
 import { runClaudeAuthModeMigration } from "../../src/claude/auth-mode-migration";
+import { runRetiredCodexModelMigration, RETIRED_MODEL_MIGRATION_CUTOFF } from "../../src/codex/retired-model-migration";
 import { providerManagementConfigError } from "../../src/server/auth-cors";
 import { removeTreeWithRetry } from "../helpers/remove-tree";
 let testDir = "";
@@ -186,6 +187,41 @@ describe("Astra-first subagent upgrade", () => {
     expect(loadConfig().port).toBe(23456);
     expect(loadConfig().modelPickerOrder).toBeUndefined();
     expect(loadConfig().subagentModels).toEqual(migrated.subagentModels);
+  });
+
+  test("a stored retired model moves to the live floor, including the pool warmup slug", () => {
+    const after = RETIRED_MODEL_MIGRATION_CUTOFF + 1;
+    const stored = {
+      ...getDefaultConfig(),
+      webSearchSidecar: { model: "gpt-5.4-mini", reasoning: "low" },
+      visionSidecar: { model: "gpt-5.4-mini" },
+      tokenGuardian: { codexWarmupEnabled: true, codexWarmupModel: "gpt-5.4-mini" },
+    } as never as ReturnType<typeof getDefaultConfig>;
+
+    expect(runRetiredCodexModelMigration(stored, after)).toBe(true);
+    expect(stored.webSearchSidecar?.model).toBe("gpt-5.6-luna");
+    expect(stored.visionSidecar?.model).toBe("gpt-5.6-luna");
+    expect(stored.tokenGuardian?.codexWarmupModel).toBe("gpt-5.6-luna");
+    // Sibling keys survive: this rewrites one slug, it does not rebuild the block.
+    expect(stored.webSearchSidecar?.reasoning).toBe("low");
+    expect(stored.tokenGuardian?.codexWarmupEnabled).toBe(true);
+    // Idempotent, so a second start does not report a write it does not need.
+    expect(runRetiredCodexModelMigration(stored, after)).toBe(false);
+  });
+
+  test("the retired-model migration leaves any other stored slug alone", () => {
+    const after = RETIRED_MODEL_MIGRATION_CUTOFF + 1;
+    const chosen = {
+      ...getDefaultConfig(),
+      webSearchSidecar: { model: "claude-sonnet-5" },
+      visionSidecar: { model: "gpt-5.6-terra" },
+      tokenGuardian: { codexWarmupModel: "gpt-5.5" },
+    } as never as ReturnType<typeof getDefaultConfig>;
+
+    expect(runRetiredCodexModelMigration(chosen, after)).toBe(false);
+    expect(chosen.webSearchSidecar?.model).toBe("claude-sonnet-5");
+    expect(chosen.visionSidecar?.model).toBe("gpt-5.6-terra");
+    expect(chosen.tokenGuardian?.codexWarmupModel).toBe("gpt-5.5");
   });
 
   test("unavailable persistence leaves malformed disk bytes untouched", () => {

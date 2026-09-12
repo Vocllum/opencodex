@@ -601,7 +601,9 @@ export interface OcxConfig {
   /**
   * Shadow call intercept: redirect Codex's hard-coded helper calls (title generation,
   * commit messages, skill orchestration) to a user-chosen model. Default intercepted
-  * source models: gpt-5.4-mini (older clients) and gpt-5.6-luna (Codex 0.145.0+).
+  * source model: gpt-5.6-luna (Codex 0.145.0+). Clients through 0.144.x emitted
+  * gpt-5.4-mini instead; that model is retired upstream, but it stays available as an
+  * opt-in `sourceModels` prefix so an old client's helper calls can still be intercepted.
   * Opt-in; disabled by default. Matching requests preserve their configured reasoning effort.
   * All requests for configured shadow source models are intercepted regardless of request kind,
   * except when the replacement intersects the same provider+model source set.
@@ -611,7 +613,7 @@ export interface OcxConfig {
    enabled?: boolean;
    /** Replacement model id (e.g. "gpt-5.5"). */
    model?: string;
-   /** Optional override of intercepted source-model prefixes (default: gpt-5.4-mini, gpt-5.6-luna). */
+   /** Optional override of intercepted source-model prefixes (default: gpt-5.6-luna). */
    sourceModels?: string[];
  };
   /**
@@ -1122,7 +1124,7 @@ export interface OcxTokenGuardianConfig {
   codexWarmupEnabled?: boolean;
   /** Max age before a Codex pool account is revalidated via `/codex/responses`. Default 691200 (8d). */
   codexWarmupMaxAgeSeconds?: number;
-  /** Model used for optional Codex pool warmup. Default gpt-5.4-mini. */
+  /** Model used for optional Codex pool warmup. Default gpt-5.6-luna. */
   codexWarmupModel?: string;
 }
 

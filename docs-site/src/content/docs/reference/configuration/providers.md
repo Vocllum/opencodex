@@ -643,7 +643,7 @@ provider in question.
 | `failureBackoffMaxSeconds?` | `number` | `3600` | Backoff ceiling and permanent-failure delay. |
 | `codexWarmupEnabled?` | `boolean` | `false` | Opt into synthetic Codex pool-account validation. |
 | `codexWarmupMaxAgeSeconds?` | `number` | `691200` | Revalidate an account after 8 days. |
-| `codexWarmupModel?` | `string` | `gpt-5.4-mini` | Native model used for optional warmup. |
+| `codexWarmupModel?` | `string` | `gpt-5.6-luna` | Native model used for optional warmup. |
 
 ## Fixed provider endpoints
 

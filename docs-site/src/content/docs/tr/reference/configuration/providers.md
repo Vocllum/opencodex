@@ -284,7 +284,7 @@ yönetilir.
 | `failureBackoffMaxSeconds?` | `number` | `3600` | Geri çekilme tavanı ve kalıcı arıza gecikmesi. |
 | `codexWarmupEnabled?` | `boolean` | `false` | Sentetik Codex havuz hesabı doğrulamasına dahil olun. |
 | `codexWarmupMaxAgeSeconds?` | `number` | `691200` | 8 gün sonra bir hesabı yeniden doğrulayın. |
-| `codexWarmupModel?` | `string` | `gpt-5.4-mini` | İsteğe bağlı ısınma için kullanılan yerel model. |
+| `codexWarmupModel?` | `string` | `gpt-5.6-luna` | İsteğe bağlı ısınma için kullanılan yerel model. |
 
 ## Sabit sağlayıcı uç noktaları
 

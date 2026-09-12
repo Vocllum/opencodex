@@ -518,7 +518,8 @@ export function applyNativeOpenAiContextOverride(entry: RawEntry, limits?: Nativ
   }
   // providerContextCaps.openai is a ceiling for native OpenAI rows regardless of where the
   // advertised window came from (#1430): preserved rows without a hardcoded override (e.g.
-  // gpt-5.4-mini) must stay under the cap too, and auto-compaction follows the capped window.
+  // gpt-5.3-codex-spark) must stay under the cap too, and auto-compaction follows the capped
+  // window.
   // The per-model window narrows the same rows for the same reason.
   const currentContext = typeof entry.context_window === "number" ? entry.context_window : undefined;
   const cappedContext = narrowNativeMaxContextWindow(nativeSlug, currentContext, limits);
