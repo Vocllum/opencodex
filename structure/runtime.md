@@ -91,6 +91,12 @@ scans may proceed if verification succeeds or the holder exits. The allowlist na
 eligibility and supplies no identity evidence by itself. This contract uses the existing verifier;
 it does not add process-instance proof or change the classification cache.
 
+Pinned post-update retries in `src/update/job.ts` retire a child after an observed exit, signal, spawn error, or close event.
+Both retry and final-timeout cleanup check the retained child object; a late exit from an older
+child cannot clear its replacement. Retirement removes only its own event listeners and preserves
+separate logging. A healthy child remains running. This does not provide an
+atomic OS guarantee against unobserved PID reuse.
+
 > Decision record: [ADR-0003](decisions/ADR-0003-lifecycle.md)
 
 An installed Codex shim is checked on ordinary CLI startup with a regular-file/1 MiB state bound plus
