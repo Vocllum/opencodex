@@ -657,6 +657,7 @@ const providerConfigSchema = z.object({
   webSearchBridge: providerWebSearchBridgeSchema.optional().catch(undefined),
   xaiResponsesXSearch: z.boolean().optional(),
   xaiResponsesDefaultVersion: z.number().int().positive().optional().catch(undefined),
+  zaiResponsesDefaultVersion: z.number().int().positive().optional().catch(undefined),
 }).passthrough();
 
 export { isValidProviderName, hasOwnProvider } from "./config/provider-name";

@@ -85,6 +85,14 @@ résultats propres à chaque route, sans répéter ce tableau.
 | `GET /api/claude-desktop/status` | Inspecter le profil enregistré par rapport à celui appliqué et l'état du bureau | 400 échec de lecture de l'état |
 | `GET, PUT /api/claude-code` | Lire ou mettre à jour les paramètres de passerelle, de mode d'authentification, de correspondance des modèles, de contexte, d'agent et de service auxiliaire | 400 champ ou structure invalide |
 
+Le tableau de bord pilote les deux chemins de coupon depuis **Providers > xAI Grok > Accounts** : chaque
+ligne de compte connecté porte un badge de ticket indiquant le nombre de coupons restants, et le
+badge ouvre une boîte de dialogue qui liste les fenêtres de validité et échange le coupon le plus
+proche de l'expiration. La boîte de dialogue envoie un `operationId` émis par le client, et cesse
+d'envoyer après un délai d'attente au lieu de réessayer, car un échange dont l'enregistrement du
+journal est encore ouvert s'exécuterait de nouveau. `ocx account grok-reset-coupons` reste l'équivalent
+en terminal.
+
 Pour comprendre la liste de modèles et le comportement chiffré des tâches confiées aux agents d'exécution, voir
 [Surface des sous-agents](/fr/guides/sub-agent-surface/).
 

@@ -71,6 +71,12 @@ Authorization: Bearer <admin-token>
 | `GET /api/claude-desktop/status` | 检查已保存与已应用的配置文件以及 Desktop 健康状态 | 400 状态读取失败 |
 | `GET, PUT /api/claude-code` | 读取或更新 Claude Code 的网关、认证模式、模型映射、上下文、代理和 sidecar 设置 | 400 字段或结构无效 |
 
+仪表板从 **Providers > xAI Grok > Accounts** 驱动这两条优惠券路径：每个已登录账号行
+都带有显示剩余优惠券数量的票据徽章，该徽章会打开一个对话框，列出有效期窗口并兑换
+最接近到期的优惠券。该对话框会发送客户端生成的 `operationId`，并在超时后停止发送而不是
+重试，因为 journal 记录仍处于打开状态的兑换会再次执行。`ocx account grok-reset-coupons`
+仍然是对应的终端命令。
+
 关于模型名录和加密工作任务行为的概念，请参见 [子代理界面](/guides/sub-agent-surface/)。
 
 ### 客户端集成回滚日志

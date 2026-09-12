@@ -71,6 +71,8 @@ Session 簽發在需要 data-plane 認證時停用，這包含遠端綁定。遠
 | `GET /api/claude-desktop/status` | 檢查已儲存 vs 已套用設定檔與 Desktop 健康 | 400 狀態讀取失敗 |
 | `GET, PUT /api/claude-code` | 讀取或更新 Claude Code 閘道、auth-mode、model-map、context、agent 與 sidecar 設定 | 400 無效欄位或結構 |
 
+儀表板從 **Providers > xAI Grok > Accounts** 驅動這兩條 coupon 路徑：每個已登入帳號列都帶有票券徽章，顯示剩餘的 reset coupon 數量，徽章會開啟對話框，列出有效期間並兌換最接近到期的 reset coupon。該對話框會送出由客戶端鑄造的 `operationId`，並在逾時後停止送出而不重試，因為日誌記錄仍為開啟的兌換會再次執行。`ocx account grok-reset-coupons` 仍是終端機等價指令。
+
 關於模型名冊與加密 worker-task 行為背後的概念，請見[子代理介面](/zh-tw/guides/sub-agent-surface/)。
 
 ### 用戶端整合復原日誌

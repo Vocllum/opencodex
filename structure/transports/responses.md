@@ -213,6 +213,16 @@ Startup removes legacy Grok 4.5/4.6 Chat overrides once and persists the provide
 rebases under the config mutation lock; unavailable persistence warns and uses an isolated in-memory
 projection without overwriting invalid disk state. Read-only config loading does not migrate.
 
+The Z.AI coding plan gets the same shape for a different reason. Its registry row owns a fixed
+destination, so `routedProviderConfig()` already rewrites a config written against the retired
+Chat endpoint (`/api/coding/paas/v4`, `openai-chat`) onto Responses at `https://api.z.ai` on every
+request. Startup persists that same canonical pair to the `zai` row once and records
+`zaiResponsesDefaultVersion`, so the dashboard, `ocx doctor` and direct config readers stop showing
+an endpoint the runtime never uses and the per-boot discarded-base-URL warning stops. The rewrite is
+behavior-preserving because it only touches a row the router canonicalizes anyway; Chat stays
+reachable per model through `modelAdapters`. A custom-named provider at the retired endpoint is not
+migrated — the router leaves its wire alone, and `destinationAliases` already supplies its metadata.
+
 The dashboard's Chat Completions switch and `ocx provider edit xai --xai-chat on|off` share the
 existing `modelAdapters` lane. On writes Chat for both models; off writes Responses. Unrelated
 overrides remain intact. The legacy PATCH field `xaiResponsesOptIn` retains its direction:

@@ -112,6 +112,7 @@ import {
   XAI_RESPONSES_DEFAULT_VERSION,
   xaiResponsesOptInState,
 } from "../../providers/xai-responses-opt-in";
+import { ZAI_PROVIDER_ID } from "../../providers/zai-responses-migration";
 import { dropProviderCustomModels } from "../../providers/provider-id-rewrite";
 
 import { isPlainRecord, parseDebugLogQuery, tokPerSecondResult, unavailableCostReason, costResult, requestLogDto, stripRegistryOnlyStaticHeaders, fetchAllModels } from "./shared";
@@ -1080,6 +1081,14 @@ export async function handleProviderRoutes(ctx: ManagementContext): Promise<Resp
       }
       if (latest?.xaiResponsesDefaultVersion !== undefined) {
         prov.xaiResponsesDefaultVersion = latest.xaiResponsesDefaultVersion;
+      }
+    }
+    // Same reason for the Z.AI marker: the provider form never carries it, and losing it on an
+    // unrelated edit would let the one-time wire rewrite run a second time.
+    if (name === ZAI_PROVIDER_ID) {
+      const latest = config.providers[name];
+      if (latest?.zaiResponsesDefaultVersion !== undefined) {
+        prov.zaiResponsesDefaultVersion = latest.zaiResponsesDefaultVersion;
       }
     }
     // Reapply pins to the latest live row after DNS/import awaits, then validate the

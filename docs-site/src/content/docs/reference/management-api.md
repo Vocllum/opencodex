@@ -85,6 +85,13 @@ route-specific results rather than repeating this table.
 | `GET /api/claude-desktop/status` | Inspect saved-versus-applied profile and Desktop health | 400 status read failure |
 | `GET, PUT /api/claude-code` | Read or update Claude Code gateway, auth-mode, model-map, context, agent, and sidecar settings | 400 invalid field or shape |
 
+The dashboard drives both coupon paths from **Providers > xAI Grok > Accounts**: each
+signed-in account row carries a ticket badge with its remaining coupon count, and the
+badge opens a dialog that lists validity windows and redeems the coupon closest to
+expiry. The dialog sends a client-minted `operationId`, and it stops sending after a
+timeout instead of retrying, because a redemption whose journal record is still open
+would execute again. `ocx account grok-reset-coupons` remains the terminal equivalent.
+
 For the concepts behind the model roster and encrypted worker-task behavior, see
 [Sub-agent Surface](/guides/sub-agent-surface/).
 

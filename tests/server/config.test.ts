@@ -41,6 +41,8 @@ import { DEFAULT_SUBAGENT_MODELS, migrateSubagentModels } from "../../src/config
 import { migrateStartupSubagentModels } from "../../src/server/subagent-models-startup";
 import { migrateXaiResponsesDefault } from "../../src/providers/xai-responses-opt-in";
 import { migrateStartupXaiResponses } from "../../src/server/xai-responses-startup";
+import { migrateZaiResponsesDefault } from "../../src/providers/zai-responses-migration";
+import { migrateStartupZaiResponses } from "../../src/server/zai-responses-startup";
 import * as configStore from "../../src/config";
 import { runClaudeAuthModeMigration } from "../../src/claude/auth-mode-migration";
 import { providerManagementConfigError } from "../../src/server/auth-cors";
@@ -299,6 +301,64 @@ describe("one-time Grok Responses upgrade", () => {
         expect(migrateStartupXaiResponses(config).providers.xai!.xaiResponsesDefaultVersion).toBe(1);
         expect(warn).toHaveBeenLastCalledWith("[xai-responses-migration] Persistence failed; using Responses in memory only.");
       } finally { mutation.mockRestore(); }
+    } finally { warn.mockRestore(); }
+  });
+});
+
+describe("one-time Z.AI Responses upgrade", () => {
+  const CANONICAL = { adapter: "openai-responses", baseUrl: "https://api.z.ai" };
+  const RETIRED = { adapter: "openai-chat", baseUrl: "https://api.z.ai/api/coding/paas/v4" };
+
+  function legacy() {
+    return {
+      ...getDefaultConfig(),
+      providers: {
+        zai: { ...RETIRED, authMode: "key" as const, defaultModel: "glm-5.3" },
+      },
+      defaultProvider: "zai",
+    };
+  }
+
+  test("read-only load keeps the retired endpoint; startup persists the canonical wire once", () => {
+    saveConfig(legacy());
+    const before = readFileSync(getConfigPath(), "utf8");
+    const config = loadConfig();
+    expect(config.providers.zai).toMatchObject(RETIRED);
+    expect(readFileSync(getConfigPath(), "utf8")).toBe(before);
+
+    const upgraded = migrateStartupZaiResponses(config);
+    expect(upgraded.providers.zai).toMatchObject({ ...CANONICAL, zaiResponsesDefaultVersion: 1 });
+    expect(upgraded.providers.zai!.defaultModel).toBe("glm-5.3");
+    expect(loadConfig().providers.zai).toEqual(upgraded.providers.zai);
+    // The caller's snapshot is not mutated in place, and a second boot is a no-op.
+    expect(config.providers.zai).toMatchObject(RETIRED);
+    expect(migrateZaiResponsesDefault(upgraded)).toBe(false);
+  });
+
+  test.each([1, 2])("an existing marker of version %i blocks a second rewrite", version => {
+    const config = legacy();
+    config.providers.zai.zaiResponsesDefaultVersion = version;
+    saveConfig(config);
+    expect(migrateStartupZaiResponses(loadConfig()).providers.zai).toEqual(config.providers.zai);
+    expect(loadConfig().providers.zai!.zaiResponsesDefaultVersion).toBe(version);
+  });
+
+  test("a custom-named row at the retired endpoint keeps its configured wire", () => {
+    const source = legacy();
+    const custom = { ...source, defaultProvider: "my-zai", providers: { "my-zai": source.providers.zai } };
+    const before = structuredClone(custom);
+    expect(migrateZaiResponsesDefault(custom)).toBe(false);
+    expect(custom).toEqual(before);
+  });
+
+  test("unavailable persistence preserves disk and returns an isolated projection", () => {
+    const config = legacy();
+    writeConfig("{ invalid");
+    const warn = spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      expect(migrateStartupZaiResponses(config).providers.zai).toMatchObject(CANONICAL);
+      expect(readFileSync(getConfigPath(), "utf8")).toBe("{ invalid");
+      expect(config.providers.zai).toMatchObject(RETIRED);
     } finally { warn.mockRestore(); }
   });
 });

@@ -1,7 +1,7 @@
 import type { CodexAccountMode, FastWire, OcxProviderConfig } from "../types";
 import { fastWireDeclarationError } from "./fastwire";
 import { KIRO_MODELS, KIRO_MODEL_CONTEXT_WINDOWS, KIRO_MODEL_REASONING_EFFORTS } from "./kiro-models";
-import { DEVIN_CLI_DEFAULT_MODEL, DEVIN_CLI_MODELS } from "../adapters/devin-cli/models";
+import { DEVIN_CLI_DEFAULT_MODEL, DEVIN_CLI_MODEL_CONTEXT_WINDOWS, DEVIN_CLI_MODELS } from "../adapters/devin-cli/models";
 import { DEVIN_MODEL_CONTEXT_WINDOWS } from "../adapters/devin/live-models";
 import { ANTIGRAVITY_MODELS, ANTIGRAVITY_MODEL_CONTEXT_WINDOWS, ANTIGRAVITY_MODEL_EFFORTS, ANTIGRAVITY_MODEL_INPUT_MODALITIES } from "./antigravity-models";
 import type { ProviderBaseUrlChoice } from "./base-url-choices";
@@ -1331,10 +1331,19 @@ export const PROVIDER_REGISTRY: readonly ProviderRegistryEntry[] = [
     baseUrl: "https://cli.devin.ai",
     authKind: "local",
     featured: false,
-    dashboardPreset: false,
+    // Reachable from the dashboard's add-provider list. `derive.ts` builds that
+    // list from `featured || authKind === "key" || dashboardPreset`, and this
+    // provider is none of the first two, so without this flag the only way to
+    // add it was to hand-edit config.json — which is how it came to be missing
+    // from a picker that already had the cloud `devin` row. The other local
+    // providers (ollama, vLLM, LM Studio) are reachable through `featured`;
+    // this one stays out of the featured strip because it needs an installed
+    // CLI and a completed `devin auth login` before it can answer anything.
+    dashboardPreset: true,
     note: "Drives the locally installed Devin CLI over the Agent Client Protocol (`devin acp`, newline-delimited JSON-RPC on stdio). Requires the CLI on PATH and a completed `devin auth login`; no API key is stored by opencodex. Set OPENCODEX_DEVIN_CLI_BIN to point at a specific build, and OPENCODEX_DEVIN_CLI_ALLOW_TOOLS=1 to let the CLI read and write files — the default is to refuse.",
     models: [...DEVIN_CLI_MODELS],
     defaultModel: DEVIN_CLI_DEFAULT_MODEL,
+    modelContextWindows: DEVIN_CLI_MODEL_CONTEXT_WINDOWS,
   },
   {
     id: "devin",

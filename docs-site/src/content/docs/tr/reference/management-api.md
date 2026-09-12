@@ -90,6 +90,15 @@ hatalar" sütunu bu tabloyu tekrarlamak yerine rotaya özgü ek sonuçları list
 | `GET /api/claude-desktop/status` | Kaydedilen ve uygulanan profili ve Desktop sağlığını inceleyin | 400 durum okuma hatası |
 | `GET, PUT /api/claude-code` | Claude Code ağ geçidi, kimlik doğrulama modu, model haritası, bağlam, ajan ve sidecar ayarlarını okuyun veya güncelleyin | 400 geçersiz alan veya şekil |
 
+Kontrol paneli her iki kupon yolunu da **Providers > xAI Grok > Accounts**
+üzerinden yürütür: oturum açmış her hesap satırı, kalan kupon sayısını gösteren
+bir bilet rozeti taşır ve rozet, geçerlilik pencerelerini listeleyen ve süresi
+dolmaya en yakın kuponu kullanan bir iletişim kutusu açar. İletişim kutusu
+istemci tarafından üretilen bir `operationId` gönderir ve yeniden denemek yerine
+zaman aşımından sonra göndermeyi durdurur; çünkü günlük kaydı hâlâ açık olan
+bir kullanım yeniden yürütülür. `ocx account grok-reset-coupons` uçbirim
+eşdeğeri olarak kalır.
+
 Model kadrosunun ve şifrelenmiş çalışan görevi davranışının arkasındaki
 kavramlar için [Alt Ajan Arayüzü](/tr/guides/sub-agent-surface/) sayfasına
 bakın.

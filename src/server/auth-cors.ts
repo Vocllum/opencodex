@@ -863,6 +863,7 @@ const PROVIDER_CONFIG_FIELD_POLICY = {
   supportsOpenAiWebSearchToolFields: "editor",
   xaiResponsesXSearch: "editor",
   xaiResponsesDefaultVersion: "runtime",
+  zaiResponsesDefaultVersion: "runtime",
   supportsResponsesCustomTools: "editor",
   responsesSnapshotRepair: "editor",
   webSearchBridge: "editor",
