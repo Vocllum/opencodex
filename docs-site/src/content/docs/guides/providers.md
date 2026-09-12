@@ -193,7 +193,7 @@ ocx logout <provider>
 | `cursor` | `cursor` | `https://api2.cursor.sh` | Experimental PKCE login, live HTTP/2 transport with an opt-in HTTP/1.1 compatibility path, and account-filtered model discovery. |
 | `orcarouter-oauth` | `openai-chat` | `https://api.orcarouter.ai/v1` | Browser consent and key exchange use `https://www.orcarouter.ai` with S256 PKCE. The returned user-owned `sk-orca-…` API key is stored in the existing credential store and reused until revoked. |
 | `devin` | `devin` | `https://server.codeium.com` | Experimental unofficial Cognition/Devin bridge. Login opens Auth0 browser sign-in, then exchanges the token via Cognition's `RegisterUser` for a long-lived API key; models are discovered per account with `GetCascadeModelConfigs`. Not shown in the dashboard preset by default. Chat and usage reporting are verified against a live account across three models. |
-| `devin-cli` | `devin-cli` | `https://cli.devin.ai` | Drives the locally installed Devin CLI over the Agent Client Protocol (`devin acp`, newline-delimited JSON-RPC on stdio). The CLI holds its own credentials from `devin auth login`, so opencodex stores no key for it. Point `OPENCODEX_DEVIN_CLI_BIN` at a specific build; letting the CLI read and write files requires setting `OPENCODEX_DEVIN_CLI_ALLOW_TOOLS=1` explicitly, because the default is to refuse. |
+| `devin-cli` | `devin` | `https://server.codeium.com` | Imports the credential your installed Devin CLI already holds (`devin auth login` writes it to its own `credentials.toml`), then streams over Cognition's Connect-RPC api-server like the `devin` provider — no browser sign-in and no key to paste. Model discovery and context windows come from your account's own catalog. For the CLI's local agent loop over ACP stdio instead, use a custom-named row with `"adapter": "devin-cli"`. |
 | `github-copilot` | `openai-chat` | `https://api.githubcopilot.com` | Experimental. GitHub device flow + `copilot_internal` exchange (VS Code OAuth client). Requires an active Copilot subscription; not an official third-party API. |
 
 Google Antigravity account and provider quota probes use fixed Google accounting endpoints, including the models fallback. They support transparent Fake-IP DNS for those destinations while retaining TLS verification, redirect rejection and private-address checks. A custom provider base URL changes model requests, not quota destinations; `NO_PROXY` continues to select the direct-route policy.
@@ -476,8 +476,16 @@ inbound value is treated as client input and
 hashed into Go affinity; the internal bridge carries the original value, so native
 Chat, bridged Chat, and Responses derive the same result. Explicit provider-config
 session headers are operator overrides and are sent unchanged. Clients must keep the
-identifier stable within a conversation and distinct across conversations; requests
-without a session identifier cannot receive automatic session affinity.
+identifier stable within a conversation and distinct across conversations. A request
+without any session identifier is not given an inferred cross-request identity; it is
+instead sent under a session allocated for that request alone, isolated from every
+other request (see the provider reference for how that value is carried).
+For Claude Messages, configured OpenCode Go session headers remain authoritative.
+Otherwise, valid explicit session or thread headers take precedence, and valid
+conversation identity in `metadata.user_id` supplies the fallback. This fallback is
+applied to the final Go destination, including random combo selections and fallback
+attempts, rather than the preliminary route. Shared system-prompt cache keys do
+not identify conversations, and Go-specific identity is not sent to non-Go targets.
 Generated Pi provider configurations enable `compat.sendSessionAffinityHeaders`
 so Pi sends its per-session identity to the proxy. Existing manually managed Pi
 configurations can set this option on their `opencodex` provider as well.

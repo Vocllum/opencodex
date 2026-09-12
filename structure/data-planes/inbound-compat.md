@@ -89,3 +89,42 @@ copies an authoritative catalog context window into `limit.context` and a nonemp
 reasoning ladder into `thinking.effortOptions`. Missing capabilities stay absent instead of
 falling back to OpenCodex guesses, and the integration does not write the removed
 `thinking.effort` / `defaultEffort` fields because MCode owns the active effort per session.
+
+Chat helper admission in `src/server/responses/core.ts` follows the
+[deferred stored-main contract](../providers/openai-tiers.md): only a needed Direct OpenAI helper
+claims stored main, after terminal vision, routed vision and search exclusions.
+
+The management quota DTO keeps Combo editing aligned with scoped inference evidence;
+see [Combo editor routing quota](../gui-and-management-api.md#combo-editor-routing-quota).
+
+## Claude affinity at final Go dispatch
+
+`src/server/claude-messages.ts` carries validated conversation affinity privately through
+Responses options. Configured Go headers win; otherwise explicit session/thread identity,
+then an explicit Go header, then valid Claude metadata, then the original request-scoped
+allocation supplies the lane. `src/server/responses/core.ts` applies it only at the final
+canonical Go transport, including combo selection and failover. No Go-only replay header
+reaches non-Go destinations. Shared system cache keys never become conversation identity.
+The request-scoped fallback is stable across retries and distinct across client requests.
+
+Claude metadata also supplies a private native-session value. Only the final canonical ChatGPT
+attempt receives it, in copied forwarding headers; an explicit underscore session, hyphenated
+session or thread header suppresses synthesis. Refresh and alternate-account retries retain
+that value. Original request headers stay unchanged so policy fallback cannot promote a generated
+native identifier into a noncanonical replay. Go preliminary selection does not suppress the
+final native affinity, and shared-system keys do not provide either conversation value.
+
+## Opt-in Claude instruction stabilization
+
+`src/claude/inbound.ts` reads only literal `claudeCode.stabilizePromptCache: true` from
+its existing configuration argument. The default is off for every translated Messages caller.
+`src/claude/inbound-cache-stabilize.ts` relocates only exact single-line trailing unfenced harness notices
+into a trailing user input message; unmatched and fenced text is preserved, including an open
+fence through EOF. Native passthrough never enters this translator. Without opt-in the original
+system-parts cache-key derivation remains unchanged; with opt-in the metadata-less key uses
+stabilized instructions. Metadata-derived keys retain their existing derivation. This configuration
+changes prompt roles, not conversation identity, and cannot guarantee upstream cache reuse.
+
+Instruction notice extraction scans fence ranges once and walks original lines backwards with
+a decreasing cursor. It accepts exactly one ASCII space inside the token notice, preserves
+unmatched prefix bytes, and does not repeatedly scan or copy shrinking prompt prefixes.

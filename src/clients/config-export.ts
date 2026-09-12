@@ -21,7 +21,7 @@
  */
 import { homedir } from "node:os";
 import { existsSync, readFileSync } from "node:fs";
-import { isAbsolute, join, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { shouldInjectApiAuthHeader, standaloneCodexRoutingTarget } from "../codex/inject";
 import { FORMAT_MEDIA_TYPE, serializeDocument, type ConfigFormat } from "../integrations/serialize";
 import { canonicalizeReasoningEfforts } from "../reasoning-effort";
@@ -47,6 +47,7 @@ import { buildOmpClientConfig, summarizeOmp, buildOmpContribution } from "./conf
 import { buildDshClientConfig, summarizeDsh, buildDshContribution } from "./config-export/dsh";
 import { buildMcodeClientConfig, summarizeMcode, buildMcodeContribution } from "./config-export/mcode";
 import { buildZcodeClientConfig, summarizeZcode, buildZcodeContribution } from "./config-export/zcode";
+import { buildClineClientConfig, summarizeCline, buildClineContribution } from "./config-export/cline";
 import { buildRaycastClientConfig, summarizeRaycast, buildRaycastContribution } from "./config-export/raycast";
 
 
@@ -1199,6 +1200,24 @@ function buildOmoContribution(ctx: ExportContext): ManagedContribution {
   return singleFragment("omo", ["providers", OPENCODE_PROVIDER_ID], doc.providers[OPENCODE_PROVIDER_ID]);
 }
 
+/** Cline's shared SDK store; command-local --config must be mirrored by the env override. */
+export function clineConfigPath(env: OpencodeLaunchEnv = process.env, home: string = homedir()): string {
+  const explicit = env.CLINE_PROVIDER_SETTINGS_PATH?.trim();
+  const data = env.CLINE_DATA_DIR?.trim();
+  const root = env.CLINE_DIR?.trim();
+  const path = explicit ? absoluteClientPath(explicit, home, "CLINE_PROVIDER_SETTINGS_PATH")
+    : join(data ? absoluteClientPath(data, home, "CLINE_DATA_DIR")
+      : join(root ? absoluteClientPath(root, home, "CLINE_DIR") : join(home, ".cline"), "data"), "settings", "providers.json");
+  if (basename(path).toLowerCase() === "models.json") {
+    throw new ClientPathError("CLINE_PROVIDER_SETTINGS_PATH must differ from the sibling models.json catalog");
+  }
+  return path;
+}
+
+export function clineSettingsDir(env: OpencodeLaunchEnv = process.env, home: string = homedir()): string {
+  return dirname(clineConfigPath(env, home));
+}
+
 export const EXPORT_CLIENTS: Record<ExportClientId, ExportClientSpec> = {
   opencode: {
     id: "opencode",
@@ -1416,6 +1435,18 @@ export const EXPORT_CLIENTS: Record<ExportClientId, ExportClientSpec> = {
      * four clients at once, so remote wiring is deferred and a non-loopback bind
      * refuses rather than generating a config that 401s.
      */
+    loopbackOnly: true,
+  },
+  cline: {
+    id: "cline",
+    filename: "cline-config-bundle.json",
+    destination: env => clineConfigPath(env),
+    apiKeyEnv: "",
+    exportHint: "Cline CLI bundle: settings goes in providers.json, catalog in sibling models.json. Stop Cline before enabling/syncing/restoring, then restart. Select --provider opencodex; the default provider stays unchanged. Loopback only.",
+    build: buildClineClientConfig,
+    format: "json",
+    summarize: summarizeCline,
+    buildContribution: buildClineContribution,
     loopbackOnly: true,
   },
 };

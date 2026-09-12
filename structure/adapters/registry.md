@@ -21,8 +21,12 @@ Some adapters share another adapter's routed-tool semantics while retaining inde
 - `devin` is the cloud half of the same family and is also direct. It streams Cognition's
   `ApiServerService/GetChatMessage` over Connect-RPC from `runTurn` with hand-written protobuf
   framing, so like Cursor and `devin-cli` it never travels the `buildRequest`/`parseStream` path.
-  The two share a name and nothing else: separate transports, separate credentials, separate
-  adapters.
+  The `devin-cli` PRESET streams over this same adapter: the installed CLI's own
+  `credentials.toml` holds an ordinary `devin-session-token`, so that provider imports the token
+  rather than spawning a child, and the two rows differ only in where the credential came from —
+  a browser sign-in versus a signed-in local CLI. The ACP adapter above remains registered and is
+  selected by a custom-named row, never by the `devin-cli` id, because `routedProviderConfig` pins
+  the adapter from the registry for any registry id.
 
 The registry records those relationships with `contractParent`. A parent relationship does **not** mean the registry recursively constructs a parent adapter and injects it into the child. Azure and MiMo keep owning their existing internal composition. This avoids making production constructors depend on test/conformance needs and keeps this authority refactor behavior-neutral.
 
@@ -52,3 +56,13 @@ request when a node carries both. Codex's own deferred tool catalog emits exactl
 so the schema is not something a user can fix from configuration (issue #2673).
 
 > Decision record: [ADR-0093](../decisions/ADR-0093-moonshot-ref-with-siblings-normalization.md)
+
+Chat helper admission in `src/server/responses/core.ts` follows the
+[deferred stored-main contract](../providers/openai-tiers.md): only a needed Direct OpenAI helper
+claims stored main, after terminal vision, routed vision and search exclusions.
+
+The management quota DTO keeps Combo editing aligned with scoped inference evidence;
+see [Combo editor routing quota](../gui-and-management-api.md#combo-editor-routing-quota).
+
+Claude replay carries [Go conversation affinity](../data-planes/inbound-compat.md#claude-affinity-at-final-go-dispatch)
+privately to final dispatch; preliminary route selection does not inject Go-only headers.

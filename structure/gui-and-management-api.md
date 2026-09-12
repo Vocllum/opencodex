@@ -308,7 +308,7 @@ single forms, and the shell pattern is the part worth keeping stable:
 | Storage | Rail plus cleanup and trash detail (`gui/src/components/storage-workspace/`). |
 | Subagents | Featured-roster selection workspace (`gui/src/components/subagents-workspace/`). |
 | Combos | Rail, detail panel, and an add flow (`gui/src/components/ComboWorkspace.tsx`). |
-| Add provider | Catalog browser plus form and OAuth panes (`gui/src/components/provider-catalog/`, `gui/src/components/AddProviderModal.tsx`). The catalog browses four tabs — Accounts, Free, Local, Paid — where Local is a catalog-only bucket peeled out of `bucketPresets` after `presetTier` has classified; the workspace `providerTier` stays three-way, so the rail, the free-paid sort and the Free count still treat a local runtime as free. Search sits above the tabs and reaches every tab at once: while a query is live the list renders all four groups with headings and the strip becomes jump chips with counts rather than a tablist, because moving the selected tab would change the row kind under the user (a preset-select button becomes a login row). The tab strip wraps within narrow modals. Every nonempty note has a full-text button so narrow rows never hide content permanently; the native note dialog closes during teardown and restores focus to its trigger. Provider notes clamp to two lines and open in full in a stacked native `<dialog>` owned by `AddProviderModal`, which also owns the search text so its `window` Escape handler can unwind popup, then query, then dialog. |
+| Add provider | Catalog browser plus form and OAuth panes (`gui/src/components/provider-catalog/`, `gui/src/components/AddProviderModal.tsx`). The catalog browses four tabs — Accounts, Free, Local, Paid — where Local is a catalog-only bucket peeled out of `bucketPresets` after `presetTier` has classified; the workspace `providerTier` stays three-way, so the rail, the free-paid sort and the Free count still treat a local runtime as free. Search sits above the tabs and reaches every tab at once: while a query is live the list renders all four groups with headings and the strip becomes jump chips with counts rather than a tablist, because moving the selected tab would change the row kind under the user (a preset-select button becomes a login row). ArrowDown from the search input focuses the first enabled result action; if none is available, focus stays in the input. The tab strip wraps within narrow modals. Every nonempty note has a full-text button so narrow rows never hide content permanently; the native note dialog closes during teardown and restores focus to its trigger. Provider notes clamp to two lines and open in full in a stacked native `<dialog>` owned by `AddProviderModal`, which also owns the search text so its `window` Escape handler can unwind popup, then query, then dialog. |
 | Codex accounts | Account pool cards, add-account flow, switch and reset modals (`gui/src/components/CodexAccountPool.tsx`, `gui/src/components/AddCodexAccountModal.tsx`), plus the generic account-targeting picker opt-in on `gui/src/pages/codex-set-multiauth.tsx`. Add/delete/login completion is projected to one boolean before presentation; pending catalog work is a warning, not a failed account mutation. |
 | Dashboard overview | Overview, Providers, and Models tabs at the page level (`gui/src/pages/Dashboard.tsx`), the 30-day token and coverage stats in the overview head (`gui/src/pages/dashboard-overview-head.tsx`), and the effort-cap, injection, maintenance, sidecar, and memory panels below it (`gui/src/pages/dashboard-overview-panels.tsx`). |
 
@@ -511,3 +511,35 @@ converge the Codex catalog once and return its disposition. The Models UI owns a
 picker data resource so failure cannot erase the ordinary model inventory; Apply publishes through
 the resource's generation fence, and Most used reads usage only on explicit Apply. Stored mode
 survives availability drift, while complete/native custom orders await explicit replacement.
+
+Chat helper admission in `src/server/responses/core.ts` follows the
+[deferred stored-main contract](providers/openai-tiers.md): only a needed Direct OpenAI helper
+claims stored main, after terminal vision, routed vision and search exclusions.
+
+## Combo editor routing quota
+
+`src/server/management/provider-routes.ts` projects `routingQuota` after each quota read using the
+current provider configuration and [scoped inference evidence](runtime.md#scoped-provider-quota-for-combo-selection).
+The DTO carries only state, observation time and an exclusive `validUntil`; cached display reports
+and private credential bindings are unchanged. Known states expire within 30 minutes; exhaustion
+may expire earlier when the runtime predicate clears at a reset boundary, accounting for other
+windows and persistent USD blockers.
+
+`gui/src/combo-workspace-data.ts` accepts only this projection for quota-based Save/Create blocking.
+Missing, invalid or expired evidence is unknown. `gui/src/pages/Combos.tsx` wakes at the rendered
+expiry, including a deadline crossed before effects run, rechecks activation and visibility, and
+refreshes quota with Combo data while preserving drafts. Each successful quota snapshot also
+advances the observation clock, so a retained older row cannot defer evaluation of a fresh row.
+
+## Paginated history writer boundary
+
+`src/codex/history-provider.ts` refuses external writes to paginated or migration-capable history. `src/codex/inject.ts` checks affected rows and manifest-owned restore targets before artifact changes and compensates detected migration. Failed config restore stops later catalog/history work. See the [history writer contract](codex-home.md#paginated-history-writer-boundary) for guarantees and concurrent-writer limits.
+
+Claude replay carries [Go conversation affinity](data-planes/inbound-compat.md#claude-affinity-at-final-go-dispatch)
+privately to final dispatch; preliminary route selection does not inject Go-only headers.
+
+Cline journal Undo eligibility reads both native configuration files through the paired
+integration IO adapter. Its snapshot fingerprint cannot be checked against providers.json alone;
+[the integration contract](clients/integrations.md#cline-paired-files) defines recovery.
+
+The existing dashboard file-client maps include Cline CLI and reuse its committed color mark. The export panel labels its download as a settings/catalog bundle; all locales explain that Undo restores both original files.

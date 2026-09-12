@@ -204,7 +204,7 @@ export default function ProviderCatalog({
   /** ArrowDown out of the input lands on the first result, never on a chip. */
   const onSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== "ArrowDown") return;
-    const first = rowsRef.current?.querySelector<HTMLElement>("button, a[href]");
+    const first = rowsRef.current?.querySelector<HTMLElement>("button:not(:disabled), a[href]");
     if (!first) return;
     e.preventDefault();
     first.focus();

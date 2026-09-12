@@ -10,6 +10,8 @@
  * Design of record: devlog/_fin/260802_client_toggle_api/030 and 031.
  */
 import { homedir } from "node:os";
+import { createClineIO, ClineTransactionError } from "./cline-io";
+import { parseClineDocument, serializeClineDocument, preserveClineSelection } from "./cline-document";
 import { dirname } from "node:path";
 import { EXPORT_CLIENTS, type ExportModel, type ManagedContribution } from "../clients/config-export";
 import { shouldInjectApiAuthHeader } from "../codex/inject";
@@ -148,13 +150,19 @@ interface CommitArgs {
  */
 function commit(args: CommitArgs): WriteOutcome {
   const { io, clientId, configPath } = args;
+  let transactionStarted = false;
   try {
+    if (io.beginTransaction) {
+      io.beginTransaction(args);
+      transactionStarted = true;
+    }
     if (args.nextText === null) io.removeFile(configPath);
     else {
       io.mkdirp(dirname(configPath));
       io.writeText(configPath, args.nextText);
     }
   } catch (error) {
+    if (transactionStarted) return compensate(args, error, "could not write both Cline files");
     return refuse(clientId, "write_failed", args.state, messageOf(error), args.snapshotPath);
   }
   try {
@@ -168,6 +176,7 @@ function commit(args: CommitArgs): WriteOutcome {
   } catch (error) {
     return compensate(args, error, "could not append the journal row");
   }
+  io.finishTransaction?.();
   return {
     ok: true,
     changed: true,
@@ -198,6 +207,7 @@ function compensate(args: CommitArgs, cause: unknown, what: string): WriteRefuse
       message: `${what}, and the change could not be rolled back. The file or its ownership record is in an intermediate state; the backup is at ${args.snapshotPath ?? "(none)"}.`,
     };
   }
+  io.finishTransaction?.();
   return refuse(clientId, "write_failed", args.state, `${what}; the change was rolled back. Cause: ${messageOf(cause)}`, args.snapshotPath);
 }
 
@@ -220,7 +230,7 @@ function sourcePreservingFragmentValue(
 /** Shared preflight: detect, gate, read, parse and classify. */
 function preflight(input: IntegrationWriteInput) {
   const store = input.store ?? createIntegrationStateStore();
-  const io = input.io ?? defaultIntegrationIO(store);
+  let io = input.io ?? defaultIntegrationIO(store);
   const clientId = input.clientId;
   const spec = INTEGRATION_CLIENTS[clientId];
   const exportSpec = EXPORT_CLIENTS[clientId];
@@ -246,7 +256,11 @@ function preflight(input: IntegrationWriteInput) {
     const resolved = input.resolvedPaths ?? resolveIntegrationPaths(clientId, input.env, input.home);
     configPath = resolved.configPath;
     detectDir = resolved.detectDir;
+    if (clientId === "cline") io = createClineIO(io, configPath, store, true);
   } catch (error) {
+    if (error instanceof ClineTransactionError) {
+      return { failed: { ...refuse(clientId, "unsafe", "unsafe", error.message, error.snapshotPath), residual: true } } as const;
+    }
     if (!(error instanceof ClientPathError)) throw error;
     return { failed: refuse(clientId, "unsafe", "unsafe", error.message) } as const;
   }
@@ -262,7 +276,7 @@ function preflight(input: IntegrationWriteInput) {
     } as const;
   }
   const before = target.before;
-  const parsed = parseConfig(before, exportSpec.format);
+  const parsed = clientId === "cline" ? parseClineDocument(before) : parseConfig(before, exportSpec.format);
   if (parsed === PARSE_FAILED) {
     return { failed: refuse(clientId, "unsafe", "unsafe",
       `${configPath} could not be parsed, or holds something opencodex cannot rewrite without changing it (a non-finite number, a large integer or a tiny one a rewrite would round, -0, a duplicate member, or nesting deeper than 1000 levels)`) } as const;
@@ -409,6 +423,7 @@ function applyOrRefreshIntegration(
     // every container exists and "did we create this?" is unanswerable.
     created = createdContainerPaths(base, contribution);
     const nextDocument = mergeContribution(base, contribution);
+    if (clientId === "cline") preserveClineSelection(parsed, nextDocument);
     if (spec.sourcePreservingYaml && before !== null) {
       const value = sourcePreservingFragmentValue(contribution, spec.sourcePreservingYaml.path);
       const patched = value === undefined
@@ -425,7 +440,7 @@ function applyOrRefreshIntegration(
       }
       text = patched;
     } else {
-      text = serializeDocument(nextDocument, exportSpec.format);
+      text = clientId === "cline" ? serializeClineDocument(nextDocument) : serializeDocument(nextDocument, exportSpec.format);
     }
   } catch (error) {
     if (error instanceof AmbiguousSelectorError) {
@@ -585,7 +600,7 @@ export function disableIntegration(input: IntegrationWriteInput): WriteOutcome {
       }
       text = patched;
     } else {
-      text = serializeDocument(doc, exportSpec.format);
+      text = clientId === "cline" ? serializeClineDocument(doc) : serializeDocument(doc, exportSpec.format);
     }
   } catch (error) {
     if (!(error instanceof UnserializableValueError)) throw error;
@@ -615,7 +630,7 @@ export function disableIntegration(input: IntegrationWriteInput): WriteOutcome {
 
 export function restoreIntegration(input: IntegrationRestoreInput): WriteOutcome {
   const store = input.store ?? createIntegrationStateStore();
-  const io = input.io ?? defaultIntegrationIO(store);
+  let io = input.io ?? defaultIntegrationIO(store);
   const entry = store.findOperation(input.opId);
   if (!entry) throw new Error(`unknown operation ${input.opId}`);
   if (entry.clientId !== input.clientId) throw new Error("restore input names a different client than the operation");
@@ -630,6 +645,13 @@ export function restoreIntegration(input: IntegrationRestoreInput): WriteOutcome
   if (resolvedPath !== configPath) {
     return refuse(clientId, "conflict", "conflict",
       `that operation was recorded for ${configPath}, but this client now resolves to ${resolvedPath}`);
+  }
+  if (clientId === "cline") {
+    try { io = createClineIO(io, configPath, store, true); }
+    catch (error) {
+      if (!(error instanceof ClineTransactionError)) throw error;
+      return { ...refuse(clientId, "unsafe", "unsafe", error.message, error.snapshotPath), residual: true };
+    }
   }
   const snapshot = store.readSnapshot(entry);
   if (snapshot.kind === "expired") {

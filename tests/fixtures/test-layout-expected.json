@@ -145,6 +145,7 @@
   "claude-desktop-remote-hub.test.ts": "claude-integration",
   "claude-dotenv-provenance-transport.test.ts": "claude-integration",
   "claude-gateway-cache.test.ts": "claude-integration",
+  "claude-inbound-cache-stabilize.test.ts": "claude-integration",
   "claude-inbound-debug.test.ts": "claude-integration",
   "claude-inbound.test.ts": "claude-integration",
   "claude-management-api.test.ts": "claude-integration",
@@ -152,6 +153,7 @@
   "claude-messages-endpoint.test.ts": "claude-integration",
   "claude-model-info.test.ts": "claude-integration",
   "claude-models-discovery.test.ts": "claude-integration",
+  "claude-native-affinity.test.ts": "claude-integration",
   "claude-native-passthrough.test.ts": "claude-integration",
   "claude-outbound.test.ts": "claude-integration",
   "claude-shell-hook.test.ts": "claude-integration",
@@ -212,10 +214,12 @@
   "client-injection-guard.test.ts": "codex-integration",
   "client-lifecycle-lock.test.ts": "clients",
   "client-machine-listener.test.ts": "clients",
+  "cline-client.test.ts": "clients",
   "cline-pass-deepseek-v4-tool-replay.test.ts": "providers",
   "cline-pass-provider.test.ts": "providers",
   "cline-pass-reasoning-efforts.test.ts": "providers",
   "cline-provider.test.ts": "providers",
+  "cline-writer.test.ts": "clients",
   "closed-pr-branch-cleanup.test.ts": "ci-workflows",
   "codebuddy-adapter.test.ts": "providers",
   "codebuddy-protocol.test.ts": "providers",
@@ -1189,5 +1193,7 @@
   "zhipu-bigmodel-responses-quota.test.ts": "providers",
   "zz-ci-api-usage-isolation.test.ts": "ci-workflows",
   "zz-ci-storage-policy-isolation.test.ts": "ci-workflows",
-  "zz-pr-coderabbit-readiness-revalidation.test.ts": "ci-workflows"
+  "zz-pr-coderabbit-readiness-revalidation.test.ts": "ci-workflows",
+  "devin-cli-login.test.ts": "providers",
+  "devin-cli-authmode-migration.test.ts": "providers"
 }

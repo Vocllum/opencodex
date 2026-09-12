@@ -134,6 +134,14 @@ upstream 요청 전에 `previous_response_not_found`를 반환합니다. Codex W
 `previous_response_id` 없이 전체 컨텍스트를 다시 보내야 합니다. 같은 ID만 재시도해서는
 누락된 상태를 복구할 수 없습니다.
 
+`statelessResponses: true`로 설정한 routed Responses provider에도 같은 복구 신호가 적용됩니다.
+routed 경로에서 custom 도구를 function으로 낮췄는데 증분 결과에 대응하는 로컬 호출 기록이
+없을 때도 전체 기록을 다시 요청합니다. 호출과 결과, reasoning을 함께 재생하며 결과 유형을
+추측하거나 버리지 않습니다. 상태를 저장하는 provider의 네이티브 function 및 네이티브 custom
+전용 continuation은 그대로 전달됩니다. 이 검사는 모델명이 아니라 선택된 wire protocol과 도구
+선언을 따릅니다. 저장된 response ID를 복원하지 못하는 gateway에는 해당 provider의
+`statelessResponses`를 명시적으로 켜세요. 다른 provider의 기본값은 바뀌지 않습니다.
+
 ## 스레드 식별자와 대화 기록
 
 기본 loopback 형식은 새 thread에 네이티브 `openai` provider 태그를 유지하므로 일반적인 resume history는 다시 매핑할 필요가 없습니다. sync와 restore는 일치하는 백업 manifest만 적용하여 각 thread의 원래 provider, source, event marker를 정확히 복원합니다. manifest가 없는 `opencodex` row는 변경하지 않으며, legacy 재태깅을 명시적으로 강제하려는 경우에만 `ocx recover-history --legacy-openai --yes`를 사용합니다. 이 명령은 의도적으로 범위가 넓습니다. 사용자 메시지가 있고 현재 `opencodex`로 표시된 모든 thread를 `openai`로 바꾸고, `exec`를 `cli`로 정규화하며 event marker를 설정합니다. 정상적인 dedicated-provider history도 포함됩니다. 상태를 백업하고 이 전체 범위를 의도한 경우에만 사용하세요. non-loopback 전용 provider 모드는 활성 상태일 때만 history를 `opencodex` provider 아래로 미러링하고, 종료할 때는 백업된 메타데이터를 복원합니다. history를 건드리지 않으려면 `syncResumeHistory: false`로 설정하세요.
@@ -291,3 +299,9 @@ ocx restore back # point plain Codex at the running proxy again
 ```
 
 opencodex가 managed [background service](/reference/cli/#ocx-service)로 실행될 때는 `OCX_SERVICE=1`을 설정하므로 service-driven restart가 Codex config를 흔들지 **않습니다**. 네이티브 Codex를 복원하는 것은 명시적인 `ocx stop` / `ocx service stop`뿐입니다.
+
+## 페이지 분할 기록 보호에 따른 거부
+
+영향받는 기록 저장소가 페이지 분할을 지원하면 프로바이더 전환이 `history_paginated_requires_native_writer`로 거부될 수 있습니다. OpenCodex는 Codex 밖에서 순번을 지정하는 대신 현재 설정, 프로필, 카탈로그, 대화 원본과 복원 근거를 보존합니다. 변환 가능한 저장소의 `legacy` 행도 포함됩니다. 외부 프로바이더 보존처럼 전환을 하지 않는 경로는 계속 사용할 수 있습니다.
+
+대화가 참조하는 프로바이더 정의를 삭제하거나, `ocx sync`·레거시 복구를 반복하거나, 실행 중인 대화 원본을 고쳐 우회하지 마세요. 현재 파일을 보존하고 복구 전에 해당 대화를 닫은 뒤, 개인 대화 내용을 올리지 말고 정확한 오류와 버전을 보고하세요. 네이티브 기록 작성자와 조정하는 검증된 수정이 필요합니다. 백업이나 스크립트 성공만으로 표시 복구가 증명되지는 않으므로 Codex를 다시 열어 확인하세요.

@@ -6,6 +6,12 @@ import type { CodexAccount } from "./accounts";
  * /v1/messages surface, the `ocx claude` launcher, and the GUI Claude page.
  */
 export interface OcxClaudeCodeConfig {
+  /**
+   * Opt-in relocation of supported trailing Claude harness notices from system instructions
+   * to a user input message on translated routes. Changes the Desktop cache-key prefix.
+   * Default: false; only literal true enables it. Native passthrough is unchanged.
+   */
+  stabilizePromptCache?: boolean;
   /** Opt-in translated Messages admission; unset keeps legacy behavior. Native passthrough is exempt. */
   compatibility?: "shadow" | "enforce";
   /** Kill switch for the /v1/messages inbound (GUI "Claude ON" toggle). Default: enabled. */

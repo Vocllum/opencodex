@@ -168,3 +168,26 @@ pin one legacy root owner before changing it. Sibling stores remain independent.
 precede coordinated writes under one scoped flight, and actual file state/refusals remain
 separate. Restore reconciles target intent from validated snapshot ownership without changing
 sibling policy. Profile journal views retain source-store provenance for older legacy entries.
+
+## Cline paired files
+
+Cline CLI uses `providers.json` for connection settings and sibling `models.json` for its
+catalog. `src/integrations/cline-document.ts` separates native documents from raw-byte snapshot
+bundles; `src/integrations/cline-io.ts` projects both files onto the existing writer/journal.
+Only each file's `providers.opencodex` entry is owned. Schema envelopes and the user's default
+provider remain user-owned. Cline's selected model and update timestamp can change during normal
+use; refresh preserves a selection only while its model remains routed. Connection fields and
+catalog membership remain protected.
+
+Each file replacement is atomic; the pair is recoverable, not simultaneously visible. Stop Cline
+before explicit enable/sync/disable/restore and restart afterward. Unattended refresh excludes
+Cline. A private pending record precedes replacement and survives partial failure. Read-only
+status reports an unfinished pair as unsafe; explicit mutation recovers only unchanged original
+or intended bytes and compatible ownership. A journaled pair must match both intended files and
+final ownership before pending cleanup. Foreign edits retain the pending evidence and refuse.
+Undo restores both original byte strings, including individual file absence; drift requires the
+existing explicit confirmation. The journal endpoint evaluates Undo against the same pair.
+
+Recovery reads commit history and ownership through strict store methods. Unreadable or malformed
+metadata is uncertainty, never evidence that a transaction did not commit. Pending records validate
+complete ownership, exact Cline paths and result fingerprints before either native file is replaced.

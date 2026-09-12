@@ -4,7 +4,7 @@ description: Connectez opencodex à OpenCode, Pi, OMP, Hermes, OpenClaw, Kimi Co
 ---
 
 L'onglet **Intégrations** écrit le bloc fournisseur d'opencodex dans le fichier de configuration du client,
-puis peut le retirer. Quatorze clients fonctionnent ainsi, chacun avec son propre commutateur :
+puis peut le retirer. Quinze clients fonctionnent ainsi, chacun avec son propre commutateur :
 
 | Client | Fichier de configuration | Format | Prise d'effet de la modification | Identifiant |
 |---|---|---|---|---|
@@ -22,6 +22,7 @@ puis peut le retirer. Quatorze clients fonctionnent ainsi, chacun avec son propr
 | Aside | `~/.aside/u/<account>/models.json` | JSON | après avoir quitté complètement puis rouvert Aside | valeur fictive de bouclage |
 | Raycast | `~/.config/raycast/ai/providers.yaml` | YAML | immédiatement à l'enregistrement — Raycast surveille le fichier | aucun — bouclage uniquement |
 | omo | `~/.omo/agent/models.json` | JSON | nouvelles sessions | espace réservé de bouclage |
+| Cline CLI | `~/.cline/data/settings/providers.json` + `models.json` | JSON | après arrêt et redémarrage | bouclage uniquement |
 
 La prise en charge gérée de DSH exige au minimum **DSH 0.1.0-rc.6**. OpenCodex ne possède que le fragment
 `llm-pi-ai.providers.opencodex` : **Appliquer** et **Actualiser** remplacent ce fragment, **Désactiver** ne
@@ -234,3 +235,15 @@ commande refuse et vous l'indique : remplacer vos modifications plus récentes r
 Les détails des clients ont été vérifiés par rapport au format de configuration propre à chaque projet ;
 consultez les notes de recherche dans
 `devlog/_fin/260802_client_toggle_api/002_client_toggle_matrix.md` pour savoir ce qui a été contrôlé et quand.
+
+## Cline CLI
+
+Cline CLI utilise providers.json et models.json. Quittez Cline avant toute modification ou synchronisation, puis redémarrez-le. Annuler restaure les deux originaux. Le fournisseur par défaut reste inchangé. Cette intégration ne migre pas le stockage des anciennes extensions VS Code.
+
+```bash
+ocx integration client enable --client cline
+ocx integration client history --client cline
+ocx integration client restore --op <operation-id>
+```
+
+[CLI / rollback / CLINE_PROVIDER_SETTINGS_PATH](/guides/integrations/#cline-cli).

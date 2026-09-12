@@ -139,7 +139,7 @@ The server exposes `POST /api/stop` which restores native Codex config, stops an
 | --- | --- |
 | `src/providers/registry.ts` | Canonical provider presets for CLI, dashboard, OAuth, key providers, and metadata. |
 | `src/providers/derive.ts` | Enrichment from provider presets into user config. |
-| `src/oauth/` | OAuth providers, token storage, refresh, and auth-token resolution. |
+| `src/oauth/` | OAuth providers, token storage, refresh, and auth-token resolution. The login callback listener binds a per-provider FIXED loopback port, so consecutive logins reuse the same number; every response it sends ends its connection (`Connection: close`, including non-callback paths such as a stray `/favicon.ico` 404). Stopping the listener does not close an established socket, so without that a pooled client would deliver the next login's callback to the retired flow, which rejects the unknown state as a CSRF mismatch while the live flow waits. |
 | `src/adapters/openai-responses.ts` | Native OpenAI/ChatGPT Responses passthrough. |
 | `src/adapters/openai-chat.ts` | OpenAI-compatible Chat Completions bridge. |
 | `src/adapters/anthropic.ts` | Anthropic Messages bridge. |
@@ -182,9 +182,46 @@ an unowned client remains disconnected. OpenCodex omits Raycast API-key fields
 and exports only to eligible local targets. Pro detection is an advisory hint,
 not an authentication or entitlement decision.
 
+Routed Responses continuations whose local replay state is missing resolve their recovery decision from the selected wire protocol, not the model name; the contract lives in [Responses transport](transports/responses.md).
+
 ## Remote Hub hardening ownership
 
 `src/remote/protocol.ts` owns pure interval/feature negotiation. `src/remote/hub-state.ts` owns the `GET|HEAD /v1/hub-state` contract, its caps, and the parser both sides share. `src/client/hub-client.ts` owns bounded, schema-validated remote catalog consumption, hub-state reads, and key-id probes; `src/client/hub-state.ts` owns the resolution and the owner-stamped 0600 cache, and a failed read reports "unavailable" rather than degrading to the client's own local provider and login state. `src/client/hub-relay.ts` is a fixed-authority management relay with URL, header, body, redirect, and stream bounds. The public data listener remains the direct client→hub path; the loopback management ingress never serves data-plane routes.
 
 Codex display-cache expiry, retained main-policy evidence, and reset history follow the
 [quota cache contract](providers/openai-tiers.md#quota-cache-and-short-window-history).
+
+Chat helper admission in `src/server/responses/core.ts` follows the
+[deferred stored-main contract](providers/openai-tiers.md): only a needed Direct OpenAI helper
+claims stored main, after terminal vision, routed vision and search exclusions.
+
+## Scoped provider quota for Combo selection
+
+`src/providers/quota.ts` publishes routing evidence only when a producer explicitly supplies its
+inference-wide projection. A matching credential alone does not grant veto authority. Display-only
+account, model-group, search and legacy MCP windows remain visible but cannot exclude a provider.
+The private WeakMap binds provider name, adapter, destination and captured credential; neither
+credential nor binding enters report JSON.
+
+`src/providers/quota-routing-cache.ts` rechecks the live single key, effective authentication,
+static credential headers and key-pool size. Unknown, invalid, future or 30-minute-old evidence
+cannot rank or veto a provider. `src/combos/resolve.ts` uses that same scoped getter for selection,
+reset-window ordering and catalog inactivity. Changing a key, destination or adapter invalidates
+the old binding; restoring the same configuration may reuse still-fresh evidence. Account admission,
+cooldowns and response-driven retry remain authoritative.
+
+The management quota DTO keeps Combo editing aligned with scoped inference evidence;
+see [Combo editor routing quota](gui-and-management-api.md#combo-editor-routing-quota).
+
+## Paginated history writer boundary
+
+`src/codex/history-provider.ts` refuses external writes to paginated or migration-capable history. `src/codex/inject.ts` checks affected rows and manifest-owned restore targets before artifact changes and compensates detected migration. Failed config restore stops later catalog/history work. See the [history writer contract](codex-home.md#paginated-history-writer-boundary) for guarantees and concurrent-writer limits.
+
+Claude replay carries [Go conversation affinity](data-planes/inbound-compat.md#claude-affinity-at-final-go-dispatch)
+privately to final dispatch; preliminary route selection does not inject Go-only headers.
+
+Cline CLI joins the existing export/client integration registries. Explicit CLI sync and POST /api/sync refresh its owned pair; unattended catalog refresh excludes it. See [Cline paired files](clients/integrations.md#cline-paired-files).
+
+`claudeCode.stabilizePromptCache` is a default-off operator setting for
+[translated instruction stabilization](data-planes/inbound-compat.md#opt-in-claude-instruction-stabilization).
+Config JSON preserves the boolean; only literal true activates the role-changing transform.

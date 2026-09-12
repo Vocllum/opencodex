@@ -303,7 +303,13 @@ logic fills absent values and preserves explicit false; renamed custom configura
 no new destination-based migration. The existing stateless pass sets `store: false`, removes
 stored continuation parameters, and repairs orphan calls/results without claiming execution
 success. A local replay-cache hit supplies history; a miss cannot reconstruct it, so callers
-must resend complete history without `previous_response_id`. This flag also enables the existing
+receive `previous_response_not_found` before upstream dispatch and must resend complete history
+without `previous_response_id`. Routed custom-tool lowering requires the same recovery when a delta
+custom result has no local call, because its original wire type cannot be established and guessing it
+would send an unmatched result upstream. The check resolves the selected wire protocol and the
+request's own tool declarations after final route selection, so stateful destinations keep their
+upstream-owned native function and native-only custom continuations. Explicit input still receives
+orphan repair; this path asks the client to replay rather than reconstructing history. This flag also enables the existing
 visible content-to-summary rewrite for SSE and JSON; summary-channel items and opaque reasoning
 blobs keep their existing response handling. The shared recording callback applies the same
 reasoning rewrite under the exact client-visible predicate before caching output, after tool
@@ -507,3 +513,13 @@ deprecated, sunset, decommissioned, or no longer available). An unrelated applic
 not retried.
 
 > Decision record: [ADR-0071](../decisions/ADR-0071-combo-streaming-commit-boundary.md)
+
+Chat helper admission in `src/server/responses/core.ts` follows the
+[deferred stored-main contract](../providers/openai-tiers.md): only a needed Direct OpenAI helper
+claims stored main, after terminal vision, routed vision and search exclusions.
+
+The management quota DTO keeps Combo editing aligned with scoped inference evidence;
+see [Combo editor routing quota](../gui-and-management-api.md#combo-editor-routing-quota).
+
+Claude replay carries [Go conversation affinity](../data-planes/inbound-compat.md#claude-affinity-at-final-go-dispatch)
+privately to final dispatch; preliminary route selection does not inject Go-only headers.

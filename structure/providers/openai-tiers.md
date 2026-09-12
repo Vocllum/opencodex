@@ -51,6 +51,15 @@ alternate-main retry authentication; the original caller's native snapshot is se
 Optional Chat/Claude stored-main enrichment still requires
 the native-main turn claim.
 
+Chat's noncanonical caller-auth branch passes only an internal permission to resolve stored
+sidecar auth later. Final helper planning checks vision terminal/routed-backend and search
+tool-choice/compaction/runTurn exclusions before requesting a canonical Direct candidate.
+Only that concrete need, without an existing explicit snapshot or exact-account selection,
+can acquire a startup- and drain-fenced native-main claim and read the stored token. The pair
+stays local to sidecar headers; caller, primary, and retry authority are unchanged. Unrelated
+Cursor turns therefore leave native main switchable while their upstream remains active.
+Pool and exact-account sidecars continue through their existing account-selection path.
+
 The two routes also keep separate request-compatibility contracts. The canonical ChatGPT Codex
 forward destination removes public `prompt_cache_options` because that backend rejects the field
 before inference; `prompt_cache_key` remains supported. `openai-apikey` and noncanonical/custom
@@ -389,3 +398,7 @@ model settings, and noncanonical `openai` rows never receive that recovery path.
 `GET /api/codex-auth/accounts?refresh=1` treats missing main credentials, HTTP 401, and allowlisted
 terminal 403 codes as `needsReauth`; generic permission failures remain non-terminal, and a
 successful main usage refresh clears the runtime mark.
+
+## Paginated history writer boundary
+
+`src/codex/history-provider.ts` refuses external writes to paginated or migration-capable history. `src/codex/inject.ts` checks affected rows and manifest-owned restore targets before artifact changes and compensates detected migration. Failed config restore stops later catalog/history work. See the [history writer contract](../codex-home.md#paginated-history-writer-boundary) for guarantees and concurrent-writer limits.

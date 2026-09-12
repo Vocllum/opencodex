@@ -145,3 +145,66 @@ test("a login in flight survives a query that does not match its row", async () 
   expect(rows).toContain("Cursor");
   expect(rows).not.toContain("Anthropic");
 });
+
+test("ArrowDown skips a disabled account action before an enabled preset result", async () => {
+  await mount({
+    accountRows: [{ id: "openai", label: "OpenAI", kind: "codex" }],
+    accountBusy: "openai",
+    onAccountLogin: () => {},
+  });
+  await type("nvidia");
+  const firstButton = win.document.querySelector<HTMLButtonElement>(".provider-catalog-rows button");
+  expect(firstButton?.disabled).toBe(true);
+  const target = win.document.querySelector(".provider-catalog-row-wrap > button");
+  expect(target?.textContent).toContain("NVIDIA NIM");
+  const input = search();
+  input.focus();
+  const event = new win.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true });
+  await act(async () => { input.dispatchEvent(event as never); });
+  expect(win.document.activeElement).toBe(target);
+  expect(event.defaultPrevented).toBe(true);
+});
+
+test("ArrowDown leaves search focused when the only result action is disabled", async () => {
+  await mount({
+    accountRows: [{ id: "openai", label: "OpenAI", kind: "codex" }],
+    accountBusy: "openai",
+    onAccountLogin: () => {},
+  });
+  await type("no-provider-matches");
+  const buttons = win.document.querySelectorAll<HTMLButtonElement>(".provider-catalog-rows button");
+  expect(buttons).toHaveLength(1);
+  expect(buttons[0]?.disabled).toBe(true);
+  expect(win.document.querySelector(".provider-catalog-rows a[href]")).toBeNull();
+  const input = search();
+  input.focus();
+  const event = new win.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true });
+  await act(async () => { input.dispatchEvent(event as never); });
+  expect(win.document.activeElement).toBe(input);
+  expect(event.defaultPrevented).toBe(false);
+});
+
+test("ArrowDown leaves search focused when there are no results", async () => {
+  await mount();
+  await type("no-provider-matches");
+  expect(win.document.querySelector(".provider-catalog-rows button, .provider-catalog-rows a[href]")).toBeNull();
+  const input = search();
+  input.focus();
+  const event = new win.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true });
+  await act(async () => { input.dispatchEvent(event as never); });
+  expect(win.document.activeElement).toBe(input);
+  expect(event.defaultPrevented).toBe(false);
+});
+
+test("ArrowDown moves directly to the first preset result", async () => {
+  await mount();
+  await type("nvidia");
+  const target = win.document.querySelector(".provider-catalog-row-wrap > button");
+  expect(target?.textContent).toContain("NVIDIA NIM");
+  const input = search();
+  input.focus();
+  const event = new win.KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true });
+  await act(async () => { input.dispatchEvent(event as never); });
+  expect(win.document.activeElement).toBe(target);
+  expect(event.defaultPrevented).toBe(true);
+});

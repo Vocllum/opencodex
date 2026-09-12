@@ -4,7 +4,7 @@ description: Kontrol panelinden OpenCode, Pi, OMP, Hermes, OpenClaw, Kimi Code, 
 ---
 
 **Entegrasyonlar** sekmesi, opencodex'in sağlayıcı bloğunu istemcinin kendi
-yapılandırma dosyasına yazar ve tekrar kaldırır. On dört istemci bu şekilde
+yapılandırma dosyasına yazar ve tekrar kaldırır. On beş istemci bu şekilde
 çalışır, her biri bir anahtarla:
 
 | İstemci | Yapılandırma dosyası | Format | Değişiklik ne zaman geçerli olur? | Kimlik bilgisi |
@@ -23,6 +23,7 @@ yapılandırma dosyasına yazar ve tekrar kaldırır. On dört istemci bu şekil
 | Aside | `~/.aside/u/<account>/models.json` | JSON | Aside tamamen kapatılıp yeniden açıldıktan sonra | geri döngü yer tutucusu |
 | Raycast | `~/.config/raycast/ai/providers.yaml` | YAML | kaydedildiği anda — Raycast dosyayı izler | yok — yalnızca geri döngü |
 | omo | `~/.omo/agent/models.json` | JSON | yeni oturumlarda | geri döngü yer tutucusu |
+| Cline CLI | `~/.cline/data/settings/providers.json` + `models.json` | JSON | kapatıp yeniden başlattıktan sonra | yalnızca loopback |
 
 Yönetilen DSH desteğinin en düşük uyumlu sürümü **DSH 0.1.0-rc.6**'dır. OpenCodex yalnızca
 `llm-pi-ai.providers.opencodex` bölümünü yönetir: Uygula ve Yenile bu bölümü değiştirir, Devre Dışı
@@ -261,3 +262,15 @@ değiştiyse, komut reddeder ve size bildirir; çünkü daha yeni düzenlemeleri
 doğrulanmıştır; neyin ne zaman denetlendiğine ilişkin
 `devlog/_fin/260802_client_toggle_api/002_client_toggle_matrix.md` içindeki
 araştırma notlarına bakın.
+
+## Cline CLI
+
+Cline CLI providers.json ve models.json kullanır. Değişiklik veya eşitleme öncesinde Cline’ı kapatın, sonra yeniden başlatın. Geri al iki özgün dosyayı geri yükler. Varsayılan sağlayıcı değişmez. Eski VS Code uzantısının depolaması taşınmaz.
+
+```bash
+ocx integration client enable --client cline
+ocx integration client history --client cline
+ocx integration client restore --op <operation-id>
+```
+
+[CLI / rollback / CLINE_PROVIDER_SETTINGS_PATH](/guides/integrations/#cline-cli).

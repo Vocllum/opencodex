@@ -3,7 +3,7 @@ title: 整合
 description: 從儀表板把 opencodex 連接到 OpenCode、Pi、OMP、Hermes、OpenClaw、Kimi Code、gjc、DeepSeek Harness、MiniMax Code、ZCode、Prime Agent、Aside、Raycast 與 omo——每個客戶端一個開關，每次寫入前都會先備份。
 ---
 
-**整合（Integrations）** 分頁會把 opencodex 的 provider 區塊寫入客戶端自己的設定檔，也會把它移除。共有十四個客戶端以這種方式運作，每個都有一個開關：
+**整合（Integrations）** 分頁會把 opencodex 的 provider 區塊寫入客戶端自己的設定檔，也會把它移除。共有十五個客戶端以這種方式運作，每個都有一個開關：
 
 | 客戶端 | 設定檔 | 格式 | 變更生效時機 | 憑證 |
 |---|---|---|---|---|
@@ -21,6 +21,7 @@ description: 從儀表板把 opencodex 連接到 OpenCode、Pi、OMP、Hermes、
 | Aside | `~/.aside/u/<account>/models.json` | JSON | 完全結束並重新開啟 Aside 後 | loopback 佔位符 |
 | Raycast | `~/.config/raycast/ai/providers.yaml` | YAML | 儲存後立即生效——Raycast 會監看該檔案 | 無——僅限 loopback |
 | omo | `~/.omo/agent/models.json` | JSON | 新工作階段 | loopback 佔位符 |
+| Cline CLI | `~/.cline/data/settings/providers.json` + `models.json` | JSON | 結束並重新啟動後 | 僅限 loopback |
 
 受管理 DSH 支援的相容性下限是 **DSH 0.1.0-rc.6**。OpenCodex 只擁有
 `llm-pi-ai.providers.opencodex`：Apply 與 Refresh 會取代該片段，Disable 只移除該片段，
@@ -148,3 +149,15 @@ OAuth 或 API key，並拒絕 `--api-key`、`--base-url` 與 `--region` 覆寫�
 `--confirm-drift` 永遠不會被擅自假設。如果檔案在你正要回復的操作之後有變更，指令會拒絕並告訴你，因為覆蓋你較新的編輯是你的決定。
 
 客戶端細節是針對各專案自己的設定格式驗證過的；檢查了什麼、何時檢查，請見 `devlog/_fin/260802_client_toggle_api/002_client_toggle_matrix.md` 中的研究筆記。
+
+## Cline CLI
+
+Cline CLI 使用 providers.json 與 models.json。修改或同步前請結束 Cline，完成後重新啟動。復原會還原兩個原始檔案，預設供應商保持不變。此整合不會遷移舊版 VS Code 擴充功能的儲存資料。
+
+```bash
+ocx integration client enable --client cline
+ocx integration client history --client cline
+ocx integration client restore --op <operation-id>
+```
+
+[CLI / rollback / CLINE_PROVIDER_SETTINGS_PATH](/guides/integrations/#cline-cli).

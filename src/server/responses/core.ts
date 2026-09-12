@@ -293,6 +293,7 @@ import {
   upstreamErrorMessageFromPayload,
 } from "../../lib/errors";
 import type { AdmissionLease } from "../../lib/admission";
+import { tryClaimNativeMainProfileForTurn as tryClaimStoredSidecarMainProfile } from "../../codex/native-main-admission";
 import { prepareEffortNormalization, supportedLadderFor } from "../effort-policy";
 import { isThreadSpawnRequest } from "../effort-policy";
 import {
@@ -413,7 +414,7 @@ import {
   payloadRewriteAsBlockRewrite,
   relaySseWithBlockRewrite,
 } from "../sse-payload-rewrite";
-import { restoreRoutedCustomCalls, restoreRoutedCustomCallsInJson } from "../../responses/custom-tool-compat";
+import { hasUnmappedRoutedCustomToolOutput, restoreRoutedCustomCalls, restoreRoutedCustomCallsInJson } from "../../responses/custom-tool-compat";
 import { createRoutedCustomToolRestoreBlockRewrite } from "../responses-custom-tool-repair";
 import { collectFunctionCallRepairSchemas, repairFunctionCallsInJson } from "../../responses/function-call-compat";
 import { createResponsesFunctionToolRepairBlockRewrite } from "../responses-function-tool-repair";
@@ -1436,6 +1437,7 @@ async function retryCodexPoolOnAlternateAccount(
   const retryAdapter = resolveAdapter(
     resolveWireProtocolOverride(route.providerName, route.modelId, retryProvider, inboundWire),
     config.cacheRetention,
+    route.providerName,
   );
   bindRouteReasoningReplayScope({
     parsed,
@@ -1680,6 +1682,10 @@ export interface ConsumedComboFailure {
 
 
 export interface HandleResponsesOptions {
+  /** Internal Claude replay identity; consumed only by the final canonical Go transport. */
+  claudeGoAffinity?: { sessionLane?: string };
+  /** Validated Claude metadata identity; projected only into final canonical attempt headers. */
+  claudeNativeSessionId?: string;
   /** Original live policy owner; separate from caller-specific routing/sidecar snapshots. */
   codexAuthPolicy?: CodexAuthPolicyConfig;
   turnAdmissionLease?: AdmissionLease;
@@ -1738,6 +1744,8 @@ export interface HandleResponsesOptions {
   trustedClaudeMainAuth?: { authorization: string; chatgptAccountId?: string };
   /** Sidecar-only auth captured before route changes; null means no usable original pair. */
   openAiSidecarAuth?: ExplicitOpenAiCallerAuth | null;
+  /** Internal Chat bridge permission to obtain claimed stored auth only for a final Direct sidecar. */
+  allowStoredOpenAiSidecarAuth?: boolean;
   /** Original caller-owned native pair; separate from any claimed sidecar enrichment. */
   nativeCallerAuth?: ExplicitOpenAiCallerAuth | null;
   /** Caller Direct credential under Direct\'s own predicate; restored only for the canonical OpenAI final route. */
@@ -2045,6 +2053,15 @@ function canPassThroughEncryptedV2AgentTask(
     provider,
     inboundWire,
   ).adapter === "openai-responses";
+}
+
+/** Keep synthesized Claude identity out of request headers reused by policy/combo fallback. */
+function withClaudeNativeSession(headers: Headers, provider: OcxProviderConfig, sessionId?: string): Headers {
+  if (!sessionId || !isCanonicalOpenAiForwardProvider(provider)
+    || headers.has("session_id") || headers.has("session-id") || headers.has("thread-id")) return headers;
+  const forwarded = new Headers(headers);
+  forwarded.set("session_id", sessionId);
+  return forwarded;
 }
 
 type ResponsesAuthResolution =
@@ -2481,6 +2498,7 @@ async function applyFinalRouteRequestNormalization(args: {
   logCtx: RequestLogContext;
   inboundWire: InboundWire;
   inboundTransport?: "websocket";
+  claudeGoAffinity?: HandleResponsesOptions["claudeGoAffinity"];
 }): Promise<void> {
   const { parsed, route, config, req, logCtx, inboundWire, inboundTransport } = args;
   const effortSelector = prepareEffortNormalization(parsed, route);
@@ -2508,7 +2526,8 @@ async function applyFinalRouteRequestNormalization(args: {
 
   // Settle the wire once so logging, fast-mode, auth, and sidecars read the adapter
   // this request will actually use (#404).
-  route.provider = resolveOpenCodeGoTransport(route.provider, getOrAllocateRequestSessionLane(req));
+  route.provider = resolveOpenCodeGoTransport(route.provider,
+    args.claudeGoAffinity ? args.claudeGoAffinity.sessionLane : getOrAllocateRequestSessionLane(req));
   route.provider = resolveWireProtocolOverride(route.providerName, route.modelId, route.provider, inboundWire);
   if (preserveAnthropicResponseModel) parsed._responseModelId = responseModelId;
   logCtx.model = route.modelId;
@@ -3901,6 +3920,22 @@ async function handleResponsesInner(
     );
   }
 
+  if (hasUnexpandedPreviousResponse) {
+    const continuationProvider = resolveWireProtocolOverride(route.providerName, route.modelId, route.provider, inboundWire);
+    // Stateless destinations cannot resolve the omitted prefix. Stateful destinations may,
+    // but a lowered custom result still needs its call to recover the original wire type.
+    // Native function/custom continuations without lowering keep their upstream-owned state.
+    if (continuationProvider.adapter === "openai-responses"
+      && (continuationProvider.statelessResponses === true
+        || hasUnmappedRoutedCustomToolOutput(parsed._rawBody, continuationProvider.supportsResponsesCustomTools))) {
+      return formatErrorResponse(
+        400,
+        "previous_response_not_found",
+        "Routed continuation requires unavailable local history; resend the full conversation without previous_response_id.",
+      );
+    }
+  }
+
   // Captured before normalization: whether the CLIENT asked for SSE. The
   // transport-neutral upstream-streaming policy below may force a bounded JSON
   // upstream for reliability (#875); the answer must then be reframed to SSE
@@ -3914,6 +3949,7 @@ async function handleResponsesInner(
     logCtx,
     inboundWire,
     inboundTransport: options.inboundTransport,
+    claudeGoAffinity: options.claudeGoAffinity,
   });
   // Attribute local auth/cooldown failures to the public selector too; exact auth may fail before
   // the normal post-resolution provider label is assigned.
@@ -3975,8 +4011,8 @@ async function handleResponsesInner(
     const finalAuth = await resolveResponsesCodexAuth(req, config, route, options, credentialDomainWasRewritten);
     if (!finalAuth.ok) return finalAuth.response;
     authCtx = finalAuth.authCtx;
-    selectedForwardHeaders = finalAuth.headers;
-    callerAuthHeaders = finalAuth.callerAuthHeaders;
+    selectedForwardHeaders = withClaudeNativeSession(finalAuth.headers, route.provider, options.claudeNativeSessionId);
+    callerAuthHeaders = withClaudeNativeSession(finalAuth.callerAuthHeaders, route.provider, options.claudeNativeSessionId);
     substituteMainCredential = finalAuth.substituteMainCredential;
   }
 
@@ -4168,7 +4204,7 @@ async function handleResponsesInner(
       && credentialGeneration(row.credential) === binding.snapshot.generation;
   };
   const resolveSelectionAdapter = (provider: OcxProviderConfig, retention = config.cacheRetention): ProviderAdapter => {
-    const resolved = resolveAdapter(provider, retention);
+    const resolved = resolveAdapter(provider, retention, route.providerName);
     if (route.provider.authMode === "forward") return resolved;
     const binding: DispatchBinding | undefined = route.provider.authMode === "oauth"
       ? oauthSelection && servingOAuthSnapshot
@@ -4564,21 +4600,42 @@ async function handleResponsesInner(
   }
 
   let openAiSidecar: ResolvedOpenAiForwardSidecar | undefined;
-  const needsOpenAiVision = shouldResolveOpenAiVisionSidecar(config, route.provider, route.modelId, parsed);
-  const needsOpenAiSearch = shouldResolveOpenAiWebSearchSidecar(config, parsed, isPassthrough);
+  const visionDescribeTerminal = options.visionDescribeTerminal === true;
+  const routedCompaction = parsed._compactionRequest === true
+    && !isCanonicalOpenAiForwardProvider(route.provider);
+  const needsOpenAiVision = !visionDescribeTerminal
+    && shouldResolveOpenAiVisionSidecar(config, route.provider, route.modelId, parsed);
+  const needsOpenAiSearch = !routedCompaction && !adapter.runTurn
+    && shouldResolveOpenAiWebSearchSidecar(config, parsed, isPassthrough);
   if (needsOpenAiVision || needsOpenAiSearch) {
     try {
+      const candidates = listOpenAiForwardSidecarCandidates(config);
+      let sidecarAuth = options.openAiSidecarAuth;
+      if (!sidecarAuth && options.allowStoredOpenAiSidecarAuth === true
+        && route.codexAccountId === undefined
+        && candidates.some(candidate => candidate.accountMode === "direct")
+        && tryClaimStoredSidecarMainProfile(options.turnAdmissionLease)) {
+        // Request-local helper authority only: never promote this pair to caller, primary,
+        // or retry credentials. Claim before reading so profile switches remain fenced.
+        try {
+          const { getMainAccountToken } = await import("../../codex/main-account");
+          const token = getMainAccountToken();
+          if (token) sidecarAuth = captureExplicitOpenAiCallerAuth(new Headers({
+            authorization: `Bearer ${token.accessToken}`, "chatgpt-account-id": token.chatgptAccountId,
+          }), config);
+        } catch { /* stored enrichment is optional */ }
+      }
       // Preserve explicit OpenAI helper auth across route changes without returning it to
       // primary-provider headers or alternate-main retry. The resolver revalidates scope.
       const sidecarHeaders = new Headers(req.headers);
       sidecarHeaders.delete("authorization");
       sidecarHeaders.delete("chatgpt-account-id");
-      if (options.openAiSidecarAuth) {
-        sidecarHeaders.set("authorization", options.openAiSidecarAuth.authorization);
-        sidecarHeaders.set("chatgpt-account-id", options.openAiSidecarAuth.chatgptAccountId);
+      if (sidecarAuth) {
+        sidecarHeaders.set("authorization", sidecarAuth.authorization);
+        sidecarHeaders.set("chatgpt-account-id", sidecarAuth.chatgptAccountId);
       }
       openAiSidecar = await resolveFirstUsableOpenAiSidecar(
-        listOpenAiForwardSidecarCandidates(config),
+        candidates,
         sidecarHeaders,
         config,
         {
@@ -4613,7 +4670,6 @@ async function handleResponsesInner(
   // call must never plan another describe. The flag arrives from the Chat
   // surface (whose bridge rebuilds headers) or as the raw header for native
   // Responses callers. Marked + text-only routed model → strip, depth cap 1.
-  const visionDescribeTerminal = options.visionDescribeTerminal === true;
   const visionPlan = visionDescribeTerminal
     ? undefined
     : planVisionSidecar(config, route.provider, route.modelId, parsed, openAiSidecar, {
@@ -4675,8 +4731,6 @@ async function handleResponsesInner(
   // `compaction_trigger` item — only the canonical ChatGPT backend speaks that
   // contract. An API-key gateway would receive the trigger, answer with an ordinary
   // message, and leave Codex fataling on a missing compaction item (#422).
-  const routedCompaction = parsed._compactionRequest === true
-    && !isCanonicalOpenAiForwardProvider(route.provider);
   const commitReasoningReplayServingRoute = (): void => {
     commitReasoningReplayServingIdentity(parsed._reasoningReplayScope);
   };
@@ -5341,7 +5395,7 @@ async function handleResponsesInner(
       }
       authCtx = replay.authCtx;
       route.provider = replay.provider;
-      selectedForwardHeaders = replay.headers;
+      selectedForwardHeaders = withClaudeNativeSession(replay.headers, replay.provider, options.claudeNativeSessionId);
       const replayAdapter = resolveSelectionAdapter(
         resolveWireProtocolOverride(route.providerName, route.modelId, replay.provider, inboundWire),
         config.cacheRetention,

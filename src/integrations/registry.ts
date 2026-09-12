@@ -12,6 +12,8 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import {
   ClientPathError,
+  clineConfigPath,
+  clineSettingsDir,
   EXPORT_CLIENTS,
   asideAccountDir,
   asideConfigPath,
@@ -298,6 +300,12 @@ export const INTEGRATION_CLIENTS: Record<IntegrationClientId, IntegrationClientS
      * and home, so reading them in sequence cannot straddle a state change.
      */
     detectDir: (env = process.env, home = homedir()) => omoAgentDir(env, home),
+  },
+  cline: {
+    id: "cline",
+    configPath: (env = process.env, home = homedir()) => clineConfigPath(env, home),
+    detectDir: (env = process.env, home = homedir()) => clineSettingsDir(env, home),
+    writerLock: { suffix: ".lock" },
   },
 };
 
