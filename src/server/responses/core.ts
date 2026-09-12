@@ -145,6 +145,7 @@ import {
   GENERIC_OAUTH_MAX_FAILOVERS_PER_REQUEST,
   isGenericFailoverProvider,
   isGenericOAuthFailoverEnabled,
+  noteGenericPoolSelection,
   preferredInitialAccount,
   rotateGenericOAuthAccountOn429,
 } from "../../oauth/generic-account-failover";
@@ -210,6 +211,7 @@ import {
   applyUpstreamRecoveryInit,
   fetchWithResetRetry,
   fetchWithTransientRetry,
+  isNonReplayableResponse,
   prepareSameTarget429Wait,
 } from "../../lib/upstream-retry";
 import {
@@ -265,6 +267,7 @@ import type { AdapterRequest, ProviderAdapter } from "../../adapters/base";
 import { providerApiKeySelectionIsCurrent, resolveCurrentProviderApiKeyTransport } from "../../providers/api-key-selection";
 import {
   hasKeyPoolFailover,
+  selectProactiveApiKeyTransport,
   rateLimitRetryDelayMs,
   rateLimitRetryPolicyFor,
   rotateProviderTransportOn429,
@@ -830,7 +833,8 @@ async function opaqueBlobRejectionBodyForRecovery(
   signal: AbortSignal,
 ): Promise<string | undefined> {
   if (
-    response.status < 400
+    isNonReplayableResponse(response)
+    || response.status < 400
     || (response.status >= 500 && response.status !== 502)
     || adapterName !== "openai-responses"
     || alreadyAttempted
@@ -1124,6 +1128,9 @@ export async function shouldRetryCodexPoolAccountQuota(
   response: Response,
   signal?: AbortSignal,
 ): Promise<boolean> {
+  // A post-send WebSocket gateway status must not become a second account's send; the
+  // body carries no quota evidence either, but the marker is the contract, not the prose.
+  if (isNonReplayableResponse(response)) return false;
   if (response.status === 402 || response.status === 429) return true;
   if (response.status < 500 || response.status >= 600) return false;
   try {
@@ -4400,6 +4407,10 @@ async function handleResponsesInner(
         // whichever account is active by the time the response comes back (#2568).
         if (isGenericFailoverProvider(route.providerName, route.provider)) {
           genericFailoverAccountId = resolved.accountId;
+          // Advance the pool cursor only now that this account is actually admitted. The
+          // helper returns immediately unless the kernel is on AND the strategy is
+          // round-robin, so quota and fill-first pools reach it without being touched.
+          noteGenericPoolSelection(config, route.providerName, resolved.accountId);
         }
         // Anthropic is excluded from isGenericFailoverProvider -- its own pool owns affinity and
         // a fail-closed local-cli credential rule -- so without this stamp its identity is
@@ -4437,6 +4448,26 @@ async function handleResponsesInner(
       return formatErrorResponse(401, "authentication_error", publicOAuthAuthenticationErrorMessage(err));
     }
   }
+  // Key-auth twin of the OAuth preference above: pick a warm key BEFORE the first attempt when
+  // the committed one is already cooling, instead of spending the request earning a 429 the
+  // runtime could already predict. The picker refuses to override a healthy committed key and
+  // returns null without a configured strategy, so an ordinary install evaluates one predicate.
+  //
+  // It RETURNS a rebuilt route rather than mutating one, and the assignment has to land here --
+  // ahead of the transport pin below, the adapterProvider copy that follows it, and the request
+  // the HTTP path bakes later. The image bridge and web search read route.provider directly and
+  // have no stale-selection re-read to save them, so ordering is the whole correctness argument.
+  //
+  // The Transport variant, not the bare picker: the picker answers with the PERSISTED row, and
+  // a built-in provider stored in its valid minimal form would lose the adapter id, base URL
+  // and static headers registry backfill supplies, throwing `Unknown adapter: undefined`.
+  const proactiveKeyProvider = selectProactiveApiKeyTransport(
+    config,
+    route.providerName,
+    route.provider,
+    parsed.options.promptCacheKey,
+  );
+  if (proactiveKeyProvider) route.provider = proactiveKeyProvider;
   route.provider = resolveProviderTransport(
     route.providerName,
     route.provider,

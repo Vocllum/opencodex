@@ -91,6 +91,7 @@ ocx login google-antigravity
 ocx login cursor       # 独立的 Cursor PKCE 登录
 ocx login command-code # Command Code 浏览器 OAuth（或导入 ~/.commandcode/auth.json）
 ocx login orcarouter-oauth # OrcaRouter 浏览器授权 + PKCE
+ocx login devin       # Cognition/Devin 的 Auth0 浏览器登录
 ocx login github-copilot  # GitHub 设备流 → Copilot 令牌（Copilot Pro/Business）
 ocx login codex        # Codex 账号池（别名：chatgpt、openai；需要代理正在运行）
 ocx logout <provider>
@@ -106,6 +107,8 @@ ocx logout <provider>
 | `google-antigravity` | `google` | `https://daily-cloudcode-pa.googleapis.com` | 通过 Cloud Code Assist 协议使用 Google OAuth。实时发现调用已认证的 CCA `v1internal:fetchAvailableModels` 端点，并仅发布当前登录账户可用的 agent 模型；维护中的目录仍作为回退。 |
 | `cursor` | `cursor` | `https://api2.cursor.sh` | 实验性 PKCE 登录、带可选 HTTP/1.1 兼容路径的 HTTP/2 传输，以及按账号筛选的模型发现。 |
 | `orcarouter-oauth` | `openai-chat` | `https://api.orcarouter.ai/v1` | 浏览器授权与密钥交换走 `https://www.orcarouter.ai` + S256 PKCE。交换结果是用户自己的普通 `sk-orca-…` API key，保存在现有凭据库中并持续复用，直到被撤销。 |
+| `devin` | `devin` | `https://server.codeium.com` | 实验性的非官方 Cognition/Devin 桥接。登录会打开 Auth0 浏览器页面，再用 `RegisterUser` 把令牌换成长期 API 密钥。模型列表按账号通过 `GetCascadeModelConfigs` 实时获取，流式仅走 Connect-RPC 上的 `runTurn` 路径。默认不在仪表盘预设中，需要手动启用。 |
+| `devin-cli` | `devin-cli` | `https://cli.devin.ai` | 通过 Agent Client Protocol（`devin acp`，stdio 上的 JSON-RPC）驱动本地安装的 Devin CLI。凭据由 CLI 自己通过 `devin auth login` 持有，opencodex 不保存密钥。可用 `OPENCODEX_DEVIN_CLI_BIN` 指定可执行文件；要允许 CLI 读写文件，必须显式设置 `OPENCODEX_DEVIN_CLI_ALLOW_TOOLS=1`，默认拒绝。 |
 | `github-copilot` | `openai-chat` | `https://api.githubcopilot.com` | 实验性。GitHub 设备流 + `copilot_internal` 交换（VS Code OAuth 客户端）。需要有效的 Copilot 订阅；不是官方第三方 API。 |
 
 Google Antigravity 账户和提供方的配额查询（包括模型列表回退）使用固定的 Google 计量端点。这些目标支持透明 Fake-IP DNS，同时保留 TLS 验证、重定向拒绝和私有地址检查。自定义 base URL 仅改变模型请求，不改变配额目标；`NO_PROXY` 仍使用直连策略。
@@ -241,7 +244,7 @@ Cline IDE/CLI 中提供，不能通过 API 使用；`minimax/minimax-m2.5` 是�
 > 视频和 3D 资源，Coding 网关也会返回这份宽泛目录，Agent Plan 网关没有 `/models` 资源。
 > 按量付费默认使用 `doubao-seed-2-1-pro-260628`，静态目录还包含当前 DeepSeek 和 GLM
 > 文本模型。Coding Plan 默认使用 `ark-code-latest`，Agent Plan 默认使用
-> `deepseek-v4-pro`。
+> `deepseek-v4-flash`。
 
 **Chutes 发现：**`chutes` 预设使用 Chutes 固定的共享 OpenAI 兼容 LLM gateway。它读取公开的
 `/v1/models` 目录，仅保留 `supported_features` 包含 `tools` 的记录，保留含 `/` 的原生 model id 与
@@ -438,7 +441,7 @@ Cursor OAuth 和 live model discovery 已在这个实验性 adapter 中启用；
 
 ### Ollama Cloud
 
-Ollama Cloud 是托管（而非本地）的 Ollama，配置地址为 `https://ollama.com/v1`，密钥来自 [ollama.com/settings/keys](https://ollama.com/settings/keys)。opencodex 通过 Ollama 自身的 REST API（`POST /api/chat`）连接，而不是 OpenAI 兼容接口，并从提供方动态发现模型列表，因此新的 Ollama Cloud 模型无需改动配置即可出现。opencodex 按视觉能力对其云端阵容进行分类，使 [vision sidecar](/zh-cn/guides/sidecars/) 仅对纯文本模型生效。纯文本模型（例如 `glm-5.2`、`deepseek-v4-pro`、`gpt-oss`、`qwen3-coder`、`minimax-m2.x`、`nemotron-3-*`）列在 `noVisionModels` 中；原生支持视觉的模型（例如 `kimi-k2.6`、`minimax-m3`、`gemma4`、`qwen3.5`、`gemini-3-flash-preview`）则不在其中。匹配能容忍 Ollama 的 `:size` 标签，因此 `gpt-oss` 涵盖 `gpt-oss:120b` 和 `gpt-oss:20b`。
+Ollama Cloud 是托管（而非本地）的 Ollama，配置地址为 `https://ollama.com/v1`，密钥来自 [ollama.com/settings/keys](https://ollama.com/settings/keys)。opencodex 通过 Ollama 自身的 REST API（`POST /api/chat`）连接，而不是 OpenAI 兼容接口，并从提供方动态发现模型列表，因此新的 Ollama Cloud 模型无需改动配置即可出现。opencodex 按视觉能力对其云端阵容进行分类，使 [vision sidecar](/zh-cn/guides/sidecars/) 仅对纯文本模型生效。纯文本模型（例如 `glm-5.2`、`deepseek-v4-flash`、`gpt-oss`、`qwen3-coder`、`minimax-m2.x`、`nemotron-3-*`）列在 `noVisionModels` 中；原生支持视觉的模型（例如 `kimi-k2.6`、`minimax-m3`、`gemma4`、`qwen3.5`、`gemini-3-flash-preview`）则不在其中。匹配能容忍 Ollama 的 `:size` 标签，因此 `gpt-oss` 涵盖 `gpt-oss:120b` 和 `gpt-oss:20b`。
 
 Ollama 目前在文档中说明结构化输出在 Ollama Cloud 上不受支持。因此对正典 `ollama-cloud`，
 opencodex 会以明确的错误拒绝结构化输出请求（`text.format`），而不是悄悄返回不受约束的自由

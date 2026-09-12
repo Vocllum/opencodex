@@ -79,6 +79,8 @@ GUI-сессия в стиле loopback не выпускается.
 | `GET /api/grok` | Прочитать статус управляемой конфигурации Grok и кандидатные модели | 400 status read failure |
 | `PUT /api/grok/selection` | Сохранить список исключённых моделей Grok | 400 invalid or oversized selection |
 | `POST /api/grok/apply` | Применить сохранённую конфигурацию Grok через managed sync | 409 `grok_apply_busy`; 400/500 apply failure |
+| `GET /api/grok/reset-coupons?accountId=...` | Прочитать оставшиеся токены сброса биллинга Grok и окна их действия для активного или указанного аккаунта xAI | 400 отсутствует аккаунт; 401 без аутентификации; 502 ошибка upstream gRPC-Web |
+| `POST /api/grok/reset-coupons/consume` | Обменять подходящий купон сброса. Тело `{ accountId?, tokenId?, operationId? }`. Необязательный `operationId` (UUIDv4) делает обмен идемпотентным: повтор того же идентификатора воспроизводит сохраненный результат без повторного обмена. | 400 некорректные JSON/UUID; 401 без аутентификации; 409 `identity_mismatch`; 502 ошибка upstream; 503 емкость реестра |
 | `GET, PUT /api/claude-desktop` | Прочитать или сохранить routed/native-профиль Claude Desktop | 400 invalid or unavailable assignment |
 | `POST /api/claude-desktop/apply` | Записать сохранённый профиль в managed config Claude Desktop | 400/500 write failure |
 | `GET /api/claude-desktop/status` | Проверить согласованность saved-vs-applied profile и здоровье Desktop | 400 status read failure |
@@ -190,7 +192,8 @@ Endpoint'ы storage cleanup могут перемещать или навсег�
 | `POST /api/oauth/logout` | Удалить сохранённый credential выбранного провайдера | 400 unknown provider; `oauth_mutation_busy` |
 | `GET, DELETE /api/oauth/accounts` | Показать список masked-аккаунтов или удалить один аккаунт | 400 invalid provider/id; 404 account missing; `oauth_mutation_busy` |
 | `PUT /api/oauth/accounts/active` | Выбрать активный OAuth-аккаунт | 400 invalid provider/account; `oauth_mutation_busy` |
-| `GET, PUT, PATCH /api/oauth/accounts/pool` | Прочитать или обновить policy Anthropic OAuth pool | 400 non-Anthropic provider or invalid policy |
+| `GET, PUT, PATCH /api/pool/settings` | Прочитать или обновить policy пула любого вида (codex, anthropic, generic); все три отвечают одинаковыми ключами, а поля, которые вид действительно применяет, перечислены в `supported` | 400 неизвестный provider, поле, которое вид не поддерживает, или недопустимое значение |
+| `GET, PUT, PATCH /api/oauth/accounts/pool` | Прежняя policy пула для Anthropic и обычных OAuth-провайдеров; заменена на `/api/pool/settings` и сохранена для существующих клиентов | 400 codex или api-key provider, либо недопустимая policy |
 | `POST /api/oauth/accounts/clear-cooldown` | Очистить runtime cooldown одного OAuth-аккаунта | 400 invalid provider/account |
 | `PUT /api/oauth/accounts/alias` | Задать или очистить alias OAuth-аккаунта | 400 invalid provider/account/alias |
 | `GET, POST, DELETE /api/providers/keys` | Показать список masked provider-key'ов, добавить/активировать один или удалить один | 400 invalid input; 404 provider/key missing |
