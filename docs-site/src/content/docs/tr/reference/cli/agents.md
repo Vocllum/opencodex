@@ -111,6 +111,8 @@ verilerini inceleyin. Doğrudan takma adlar şunlardır:
 ocx observe usage --range 30d --json
 ```
 
+Bazı kullanım kayıtları dahil edilemiyorsa okunabilir çıktı, okunabilir satır olmadığında da uyarı gösterir. Gösterilen toplamlar yalnızca okunabilir kayıtları yansıtır. Filtreyle eşleşen okunabilir kayıt yoksa toplam satırları yerine uyarı ve yönlendirme gösterilir; atlanan kayıtlar eşleşme içerebilir. `--json`, yanıttaki `usageIncomplete` tanısını ve nedenini korur.
+
 ### `ocx debug <provider|usage|injection|claude> <on|off|status|reset|logs [-f]>`
 
 Çalışan proxy'nin yönetim API'si aracılığıyla çalışma zamanı hata ayıklama
@@ -286,6 +288,12 @@ sekmesinde işlenir; böylece CLI, API ve GUI aynı baytları kullanır.
 Başsız çalışma zamanı ayarlarını, başlatmayı, senkronizasyonu, tanılamayı ve
 güncellemeleri yönetin.
 
+`ocx system codex-restart --yes`, `ocx sync --restart-codex` ile aynı modül
+üzerinden Codex app-server'larını yeniden başlatır ve Codex masaüstü
+uygulamasını tamamen kapatıp yeniden başlatır. Proxy'nin kendisi Codex
+uygulamasının içinde çalışıyorsa, tamamlayamayacağı bir devri vaat etmek
+yerine eyleme geçirilebilir bir iletiyle reddeder.
+
 ```bash
 ocx system settings --stream-mode eager-relay
 ```
@@ -296,7 +304,9 @@ ocx system settings --stream-mode eager-relay
 ocx system codex-cli-update check --json
 ```
 
-`check` paket kayıt defterine istek göndermez ve yapılandırmada belirtilen kurulum adayına ilişkin provenance kanıtını, maskelenmiş yürütülebilir dosya konumu ve sahiplik kanıtı dâhil, sınırlı biçimde inceler. Yayımlanmış başlatıcıdan gelen güvenilir bağlam aday anlık görüntüsünü doğrular; Codex'in başarıyla çalıştırıldığını doğrulamaz. Bu tek seferlik komut Codex'i hiçbir zaman çalıştırmadığından, ortamdan ve kalıcı kayıtlardan gelen adaylar yalnızca raporlanır (`managed: false`, genellikle `selection_unattested`). JSON çıktısında `candidateAvailable`, `candidateVersion` ve `candidateSource` alanları bulunur; `selectionAttested` değeri ise `false` kalır. Yapılandırmada belirtilen kurulum adayını incelemek için yayımlanmış başlatıcıdan gelen güvenilir bağlam gerekir; Bun ile veya kaynak koddan doğrudan başlatıldığında bu kanıt bulunmadığından ortamdaki ve kalıcı kayıtlardaki aday durumu yok sayılır ve `candidate_unavailable` bildirilebilir. Windows'ta bu ilk parça, aday veya yapılandırma yollarında hiçbir dosya sistemi G/Ç işlemi yapmaz. Yalnızca güvenilir başlatıcının yakaladığı mutlak bir ortam adayı sözcüksel olarak uygulama paketi ya da sürüm yöneticisi etiketi alabilir; diğer tüm Windows adayları kapalı başarısızlıkla reddedilir. Komut Codex veya bir paket yöneticisi çalıştırmaz, shim'i onarmaz, yapılandırmaya ya da önbellek durumuna yazmaz, hiçbir süreci durdurmaz ve hiçbir şey kurmaz. Uygulamayla birlikte paketlenmiş adaylar, tanınan sürüm yöneticisi yollarında bulunan adaylar, doğrulanmamış bağımsız adaylar ve belirsiz shim durumları `unmanaged` veya `unknown` olarak raporlanır; hiçbir zaman `managed` olarak sınıflandırılmaz.
+`check` paket kayıt defterine istek göndermez ve yapılandırmada belirtilen kurulum adayına ilişkin provenance kanıtını, maskelenmiş yürütülebilir dosya konumu ve sahiplik kanıtı dâhil, sınırlı biçimde inceler. Yayımlanmış başlatıcıdan gelen güvenilir bağlam aday anlık görüntüsünü doğrular; Codex'in başarıyla çalıştırıldığını doğrulamaz. Bu tek seferlik komut Codex'i hiçbir zaman çalıştırmadığından, ortamdan ve kalıcı kayıtlardan gelen adaylar yalnızca raporlanır (`managed: false`, genellikle `selection_unattested`). JSON çıktısında `candidateAvailable`, `candidateVersion` ve `candidateSource` alanları bulunur; `selectionAttested` değeri ise `false` kalır. Yapılandırmada belirtilen kurulum adayını incelemek için yayımlanmış başlatıcıdan gelen güvenilir bağlam gerekir; Bun ile veya kaynak koddan doğrudan başlatıldığında bu kanıt bulunmadığından ortamdaki ve kalıcı kayıtlardaki aday durumu yok sayılır ve POSIX sistemlerinde `candidate_unavailable` bildirilebilir. Windows'ta bu ilk parça, aday veya yapılandırma yollarında hiçbir dosya sistemi G/Ç işlemi yapmaz. Yalnızca güvenilir başlatıcının yakaladığı mutlak bir ortam adayı sözcüksel olarak uygulama paketi ya da sürüm yöneticisi etiketi alabilir; diğer tüm Windows adayları kapalı başarısızlıkla reddedilir. Bu parça kalıcı seçim durumunu hiç okumadığından, ortam adayı yakalanmamış olan Windows çalıştırmaları `candidate_unavailable` yerine `windows_inspection_deferred` bildirir: komut bir Codex CLI'nin kurulu olup olmadığını gözlemleyemez, bu yüzden aday bulunmadığını iddia etmek yerine incelemenin ertelendiğini bildirir. Komut Codex veya bir paket yöneticisi çalıştırmaz, shim'i onarmaz, yapılandırmaya ya da önbellek durumuna yazmaz, hiçbir süreci durdurmaz ve hiçbir şey kurmaz. Uygulamayla birlikte paketlenmiş adaylar, tanınan sürüm yöneticisi yollarında bulunan adaylar, doğrulanmamış bağımsız adaylar ve belirsiz shim durumları `unmanaged` veya `unknown` olarak raporlanır; hiçbir zaman `managed` olarak sınıflandırılmaz.
+
+Windows üzerinde `CODEX_CLI_PATH=codex` gibi yalın bir komut, uzak yol veya aygıt yolu aday olarak yakalanırsa `candidate_path_unavailable` bildirilir. Aday yakalanmıştır; ancak yolu bu inceleme için uygun değildir.
 
 ### `ocx config <show|get|set|unset|validate|export|import> ...`
 

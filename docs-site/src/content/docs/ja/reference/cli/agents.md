@@ -69,6 +69,8 @@ ocx route combo set reliable --targets ark/model-a:2,openai/gpt-5.5
 ocx observe usage --range 30d --json
 ```
 
+一部の使用履歴を集計できない場合、人向けの出力は読み取れる行がない場合も警告を表示します。表示される合計値は読み取れる記録のみを反映します。フィルターに一致する読み取れる記録がない場合は、合計欄の代わりに警告と案内を表示します。除外した記録には一致するものが含まれる可能性があります。`--json` は応答の `usageIncomplete` 診断と理由をそのまま保持します。
+
 ### `ocx debug <provider|usage|injection|claude> <on|off|status|reset|logs [-f]>`
 
 実行中のプロキシの管理 API を通じて、ランタイム デバッグ オーバーライドを読み取りまたは変更します。
@@ -182,6 +184,8 @@ opencode は `{env:OPENCODEX_OPENCODE_API_KEY}` を補間します。opencodex �
 
 ヘッドレス ランタイムの設定、起動、同期、診断、更新を管理します。
 
+`ocx system codex-restart --yes` は `ocx sync --restart-codex` と同じモジュールで Codex app-server を再起動し、デスクトップ アプリも完全に終了して再起動します。プロキシ自体が Codex アプリ内で動いている場合、完了できない引き渡しを約束せず、実行可能な案内とともに拒否します。
+
 ```bash
 ocx system settings --stream-mode eager-relay
 ```
@@ -192,7 +196,9 @@ ocx system settings --stream-mode eager-relay
 ocx system codex-cli-update check --json
 ```
 
-`check` はパッケージレジストリに問い合わせず、設定済みのインストール候補について、秘匿化された実行ファイルの場所や所有権を示す根拠を含む来歴情報を、範囲を限定して検査します。公開ランチャー由来の信頼済みコンテキストが真正性を裏付けるのは候補のスナップショットだけであり、Codex が正常に実行されたことではありません。この単発コマンドは Codex を一切実行しないため、環境または永続化された状態から得た候補は報告対象にとどまります（`managed: false`、通常は `selection_unattested`）。`selectionAttested` は常に `false` です。JSON 出力には `candidateAvailable`、`candidateVersion`、`candidateSource`、`selectionAttested: false` が含まれます。Bun またはソースから直接起動するとランチャーの証明がないため、環境由来および永続化された候補を無視し、`candidate_unavailable` を報告することがあります。Windows では、この最初のスライスは候補や構成のパスに対するファイルシステム I/O を一切行いません。信頼済みランチャーが取り込んだ絶対パスの環境候補だけを、アプリ同梱またはバージョンマネージャーとして字句的に報告でき、それ以外の Windows 候補はすべて失敗時閉鎖になります。このコマンドは Codex やパッケージマネージャーの実行、shim の修復、設定やキャッシュ状態への書き込み、プロセスの停止、インストールを行いません。アプリ同梱、認識済みのバージョンマネージャー、未検証のスタンドアロン、曖昧な shim の各候補は管理対象外または不明として報告され、管理対象と判定されることはありません。
+`check` はパッケージレジストリに問い合わせず、設定済みのインストール候補について、秘匿化された実行ファイルの場所や所有権を示す根拠を含む来歴情報を、範囲を限定して検査します。公開ランチャー由来の信頼済みコンテキストが真正性を裏付けるのは候補のスナップショットだけであり、Codex が正常に実行されたことではありません。この単発コマンドは Codex を一切実行しないため、環境または永続化された状態から得た候補は報告対象にとどまります（`managed: false`、通常は `selection_unattested`）。`selectionAttested` は常に `false` です。JSON 出力には `candidateAvailable`、`candidateVersion`、`candidateSource`、`selectionAttested: false` が含まれます。Bun またはソースから直接起動するとランチャーの証明がないため、環境由来および永続化された候補を無視し、POSIX では `candidate_unavailable` を報告することがあります。Windows では、この最初のスライスは候補や構成のパスに対するファイルシステム I/O を一切行いません。信頼済みランチャーが取り込んだ絶対パスの環境候補だけを、アプリ同梱またはバージョンマネージャーとして字句的に報告でき、それ以外の Windows 候補はすべて失敗時閉鎖になります。このスライスは永続化された選択状態を一切読み取らないため、環境候補がキャプチャされていない Windows 実行では `candidate_unavailable` ではなく `windows_inspection_deferred` を報告します。コマンドは Codex CLI が導入されているかどうかを観測できないので、候補が存在しないと断定せず、検査が延期されたことを報告します。このコマンドは Codex やパッケージマネージャーの実行、shim の修復、設定やキャッシュ状態への書き込み、プロセスの停止、インストールを行いません。アプリ同梱、認識済みのバージョンマネージャー、未検証のスタンドアロン、曖昧な shim の各候補は管理対象外または不明として報告され、管理対象と判定されることはありません。
+
+Windows で `CODEX_CLI_PATH=codex` のような単純なコマンド名、リモートパス、デバイスパスが候補としてキャプチャされた場合は、`candidate_path_unavailable` を報告します。候補は取得されていますが、そのパスはこの検査の対象になりません。
 
 ### `ocx config <show|get|set|unset|validate|export|import> ...`
 

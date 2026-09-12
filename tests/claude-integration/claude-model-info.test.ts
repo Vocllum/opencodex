@@ -1,8 +1,33 @@
 import { describe, expect, test } from "bun:test";
 import { buildAnthropicModelInfos, nativeEffectiveLadder } from "../../src/claude/model-info";
-import { nativeEffortClamp } from "../../src/codex/catalog";
+import { gatherRoutedModels, nativeEffortClamp } from "../../src/codex/catalog";
 
 describe("anthropic-flavor ModelInfo discovery entries (devlog 130 B4b)", () => {
+  test.each(["anthropic", "anthropic-apikey"])("%s registry image inputs reach Claude discovery aliases", async (provider) => {
+    const models = await gatherRoutedModels({
+      port: 10100,
+      defaultProvider: provider,
+      providers: {
+        [provider]: {
+          adapter: "anthropic",
+          baseUrl: "https://api.anthropic.com",
+          authMode: provider === "anthropic" ? "oauth" : "key",
+          liveModels: false,
+        },
+      },
+    });
+    const routed = models.filter(model => model.provider === provider);
+    expect(routed.length).toBeGreaterThan(0);
+    for (const idStyle of ["readable", "desktop3p"] as const) {
+      const infos = buildAnthropicModelInfos([], routed, undefined, idStyle);
+      expect(infos.length).toBeGreaterThanOrEqual(routed.length);
+      expect(infos.some(info => info.id.endsWith("[1m]"))).toBe(true);
+      for (const info of infos) {
+        expect(info.capabilities.image_input.supported).toBe(true);
+      }
+    }
+  });
+
   test("routed model with adapter-reported ladder advertises exactly those rungs", () => {
     const [info] = buildAnthropicModelInfos([], [{
       provider: "cursor", id: "gpt-5.6-luna",
@@ -61,7 +86,7 @@ describe("anthropic-flavor ModelInfo discovery entries (devlog 130 B4b)", () => 
   });
 
   test("native effective ladder only advertises clamp-identity rungs (audit R4#1)", () => {
-    for (const slug of ["gpt-5.5", "gpt-5.3-codex-spark", "gpt-5.6-sol"]) {
+    for (const slug of ["gpt-5.5", "gpt-5.6-luna", "gpt-5.6-sol"]) {
       for (const rung of nativeEffectiveLadder(slug)) {
         expect(rung).not.toBe("ultra");
         const clamped = nativeEffortClamp(slug, rung);
@@ -98,8 +123,8 @@ describe("anthropic-flavor ModelInfo discovery entries (devlog 130 B4b)", () => 
 
   test("[1m] variants skip natives — none have a >=1M window after gpt-5.4 retirement", () => {
     // gpt-5.4 was the only authoritative 1M native; that override is gone. gpt-5.6-sol
-    // advertises 922k under its measured ceiling, gpt-5.5 is 272k, spark is 100k.
-    const infos = buildAnthropicModelInfos(["gpt-5.6-sol", "gpt-5.5", "gpt-5.3-codex-spark"], []);
+    // stays below 1M even with the long-window opt-in; gpt-5.5 and Astra default to 272k.
+    const infos = buildAnthropicModelInfos(["gpt-5.6-sol", "gpt-5.5", "gpt-6-astra"], []);
     expect(infos.filter(i => i.id.endsWith("[1m]"))).toHaveLength(0);
   });
 

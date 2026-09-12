@@ -94,6 +94,8 @@ ocx route combo set reliable --targets ark/model-a:2,openai/gpt-5.5
 ocx observe usage --range 30d --json
 ```
 
+일부 사용량 기록을 집계하지 못하면 일반 출력은 읽을 수 있는 행이 없어도 경고합니다. 표시되는 합계는 읽을 수 있는 기록만 반영합니다. 필터에 일치하는 읽을 수 있는 기록이 없으면 합계 항목 대신 경고와 안내를 표시하며, 제외된 기록에는 일치하는 항목이 있을 수 있습니다. `--json`은 응답의 `usageIncomplete` 진단과 사유를 그대로 유지합니다.
+
 ### `ocx debug <provider|usage|injection|claude> <on|off|status|reset|logs [-f]>`
 
 실행 중인 프록시의 관리 API를 통해 런타임 디버그 override를 읽거나 변경합니다.
@@ -209,6 +211,11 @@ opencode는 `{env:OPENCODEX_OPENCODE_API_KEY}`를 보간합니다. opencodex가 
 
 헤드리스 런타임 설정, 시작, 동기화, 진단, 업데이트를 관리합니다.
 
+`ocx system codex-restart --yes`는 `ocx sync --restart-codex`와 같은 모듈로 Codex
+app-server를 재시작하고 데스크톱 앱도 완전히 종료한 뒤 다시 띄웁니다. 프록시 자체가
+Codex 앱 안에서 실행 중이면 넘길 수 없는 handoff를 약속하지 않고, 대신 실행 가능한
+안내와 함께 거절합니다.
+
 ```bash
 ocx system settings --stream-mode eager-relay
 ```
@@ -219,8 +226,14 @@ ocx system settings --stream-mode eager-relay
 ocx system codex-cli-update check --json
 ```
 
-`check`는 패키지 레지스트리를 조회하지 않고, 설정된 설치 후보에 대해 전체 경로를 숨긴 실행 파일 위치와 소유권 근거를 포함한 provenance 정보를 제한된 범위에서 검사합니다. 신뢰할 수 있는 배포 런처 컨텍스트가 인증하는 것은 후보 스냅샷뿐이며, Codex가 성공적으로 실행되었다는 사실은 인증하지 않습니다. 이 단발성 명령은 Codex를 전혀 실행하지 않으므로 환경 또는 저장된 상태에서 얻은 후보는 보고 전용입니다(`managed: false`, 일반적으로 `selection_unattested`). `selectionAttested`는 항상 `false`입니다. JSON 출력에는 `candidateAvailable`, `candidateVersion`, `candidateSource`, `selectionAttested: false`가 포함됩니다. Bun이나 소스에서 직접 실행하면 런처 증거가 없으므로 환경 및 저장된 후보를 무시하고 `candidate_unavailable`을 보고할 수 있습니다. Windows에서는 이 첫 조각이 후보 또는 설정 경로의 파일시스템을 전혀 읽지 않습니다. 배포 런처가 증명한 절대 환경 후보에 한해서 앱 번들 또는 버전 관리자라는 어휘적 표지만 보고하며, 그 밖의 Windows 후보는 모두 실패 닫힘 처리합니다. 이 명령은 Codex나 패키지 관리자를 실행하거나 shim을 복구하지 않고, 설정 또는 캐시 상태를 쓰거나 프로세스를 중지하거나 어떤 것도 설치하지 않습니다. 앱에 포함된 후보, 인식된 버전 관리자의 후보, 검증되지 않은 독립 실행형 후보, shim 상태가 모호한 후보는 관리 대상이 아니거나 알 수 없는 것으로 보고되며, 관리 대상으로 분류되지 않습니다.
+`check`는 패키지 레지스트리를 조회하지 않고, 설정된 설치 후보에 대해 전체 경로를 숨긴 실행 파일 위치와 소유권 근거를 포함한 provenance 정보를 제한된 범위에서 검사합니다. 신뢰할 수 있는 배포 런처 컨텍스트가 인증하는 것은 후보 스냅샷뿐이며, Codex가 성공적으로 실행되었다는 사실은 인증하지 않습니다. 이 단발성 명령은 Codex를 전혀 실행하지 않으므로 환경 또는 저장된 상태에서 얻은 후보는 보고 전용입니다(`managed: false`, 일반적으로 `selection_unattested`). `selectionAttested`는 항상 `false`입니다. JSON 출력에는 `candidateAvailable`, `candidateVersion`, `candidateSource`, `selectionAttested: false`가 포함됩니다. Bun이나 소스에서 직접 실행하면 런처 증거가 없으므로 환경 및 저장된 후보를 무시하고 POSIX에서는 `candidate_unavailable`을 보고할 수 있습니다. Windows에서는 이 첫 조각이 후보 또는 설정 경로의 파일시스템을 전혀 읽지 않습니다. 배포 런처가 증명한 절대 환경 후보에 한해서 앱 번들 또는 버전 관리자라는 어휘적 표지만 보고하며, 그 밖의 Windows 후보는 모두 실패 닫힘 처리합니다. 이 조각은 저장된 선택 상태를 전혀 읽지 않으므로, 환경 후보가 캡처되지 않은 Windows 실행은 `candidate_unavailable`이 아니라 `windows_inspection_deferred`를 보고합니다. 명령이 Codex CLI 설치 여부를 관측할 수 없으므로, 후보가 없다고 단정하는 대신 검사가 연기되었음을 보고합니다. 이 명령은 Codex나 패키지 관리자를 실행하거나 shim을 복구하지 않고, 설정 또는 캐시 상태를 쓰거나 프로세스를 중지하거나 어떤 것도 설치하지 않습니다. 앱에 포함된 후보, 인식된 버전 관리자의 후보, 검증되지 않은 독립 실행형 후보, shim 상태가 모호한 후보는 관리 대상이 아니거나 알 수 없는 것으로 보고되며, 관리 대상으로 분류되지 않습니다.
+
+Windows에서 `CODEX_CLI_PATH=codex` 같은 단순 명령 이름이나 원격 경로·장치 경로가 후보로 캡처되면 `candidate_path_unavailable`을 보고합니다. 후보는 캡처됐지만 해당 경로가 이 검사 대상에 적합하지 않은 경우입니다.
 
 ### `ocx config <show|get|set|unset|validate|export|import> ...`
 
 검증된 OpenCodex configuration을 검사하고 안전하게 수정합니다. `show`와 `get`은 비밀 값을 가립니다. import는 쓰기 전에 검증하며 `--yes`가 필요합니다.
+
+### 연결된 클라이언트의 사용량
+
+`ocx usage`는 등록된 데이터 키로 허브에서 이 클라이언트의 사용량만 읽습니다. 출력에는 허브 출처와 키 범위가 표시됩니다. 기간·모델·공급자 필터와 `--since`/`--until`, `--json`을 그대로 사용할 수 있습니다. 계정별 내역과 다른 클라이언트 기록은 반환하지 않습니다. 허브가 응답하지 않거나 이 기능을 지원하지 않으면 오류를 알립니다. 로컬 기록으로 대신 표시하지 않습니다. 구형 허브라면 허브를 업데이트하세요.

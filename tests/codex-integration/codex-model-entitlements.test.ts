@@ -6,6 +6,7 @@ import {
   ACCOUNT_GATED_NATIVE_MODEL_MINIMUM_CLIENT_VERSIONS,
   availableAccountGatedNativeModels,
   cachedAvailableAccountGatedNativeModels,
+  cachedDeniedCodexAccountIdsForModel,
   codexModelEntitlementStateForAccount,
   composeGatedClientVersionFloorForTests,
   compareClientVersionsForTests,
@@ -45,6 +46,7 @@ const DAYBREAK = "gpt-daybreak-blue-latest";
 const SOL = "gpt-5.6-sol";
 const TERRA = "gpt-5.6-terra";
 const LUNA = "gpt-5.6-luna";
+const ASTRA = "gpt-6-astra";
 
 function credential(accountId: string): CodexModelEntitlementCredentialSnapshot {
   return {
@@ -1544,6 +1546,81 @@ describe("entitlement client version (#2886)", () => {
     expect(fetches).toBe(afterFill + 1);
   });
 
+  test("capacity-rejected versions do not consume the miss allowance", async () => {
+    let fetches = 0;
+    let hold = true;
+    const release: Array<() => void> = [];
+    const backend = (async () => {
+      fetches += 1;
+      if (hold) await new Promise<void>(resolve => release.push(resolve));
+      return roster(SOL);
+    }) as typeof fetch;
+    const credentials = [credential("pool-capacity-budget")];
+    const ask = (clientVersion: string) => resolveCodexModelEntitlements({ codexAccounts: [] }, {
+      fetcher: backend, now: 1_000, clientVersion, credentials,
+      loadPersistedRuntime: () => ({ selectedVersion: "0.300.0" }),
+    });
+    const pending = ["0.300.0", "0.400.0", "0.401.0", "0.402.0"].map(ask);
+    try {
+      for (let i = 0; i < 100 && release.length < 4; i += 1) {
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
+      expect(fetches).toBe(4);
+      const rejected = await ask("0.403.0");
+      expect(rejected.confirmedAccountIds.has("pool-capacity-budget")).toBe(false);
+      expect(fetches).toBe(4);
+    } finally {
+      hold = false;
+      for (const resolve of release) resolve();
+      await Promise.all(pending);
+    }
+    // Only three caller-selected versions opened a flight. A different fourth version
+    // must still be admitted once capacity is free; the rejected attempt spent nothing.
+    const admitted = await ask("0.404.0");
+    expect(fetches).toBe(5);
+    expect(admitted.confirmedAccountIds.has("pool-capacity-budget")).toBe(true);
+  });
+
+  test("completed caller-selected version misses are bounded per account", async () => {
+    // The cache budget bounds stored state and the flight budget bounds concurrency. Neither
+    // bounds COMPLETED work, so a caller cycling client_version and waiting for each answer could
+    // renew an authenticated upstream request under the account token as often as it liked.
+    let fetches = 0;
+    const backend = (async () => { fetches += 1; return roster(SOL); }) as typeof fetch;
+    const credentials = [{
+      accountId: "pool-miss-budget",
+      accessToken: "tok-miss",
+      chatgptAccountId: "acct-miss",
+      credentialIdentity: "pool:1:acct-miss",
+    }];
+    const ask = (clientVersion: string) => resolveCodexModelEntitlements({ codexAccounts: [] }, {
+      fetcher: backend,
+      now: 1_000,
+      clientVersion,
+      credentials,
+      loadPersistedRuntime: () => ({ selectedVersion: "0.300.0" }),
+    });
+
+    for (let i = 0; i < 8; i += 1) await ask(`0.${400 + i}.0`);
+    expect(fetches).toBe(4);
+
+    // Over the allowance the answer is UNCONFIRMED - the same fail-closed shape a discovery
+    // failure produces, never a confirmed denial assembled from a roster nobody fetched.
+    const refused = await ask("0.499.0");
+    expect(refused.confirmedAccountIds.has("pool-miss-budget")).toBe(false);
+    expect(fetches).toBe(4);
+
+    // A version already charged keeps retrying. One client coming back every 15s on the failure
+    // TTL must not spend the allowance and lock itself out for the rest of the roster window.
+    await ask("0.400.0");
+    expect(fetches).toBe(5);
+
+    // The locally selected runtime version is never charged, so its legitimate refresh survives
+    // an untrusted caller spending everything else.
+    await ask("0.300.0");
+    expect(fetches).toBe(6);
+  });
+
   test("the class budget counts accounts, not cached keys", async () => {
     // The documented budget is 64 ACCOUNTS per class. Counting keys instead would silently divide
     // that by the per-account version bound, so a deployment well inside the intended limit would
@@ -1716,5 +1793,75 @@ describe("entitlement client version (#2886)", () => {
     // success TTL in place would pass an assertion about the flag alone.
     expect(await ask(1_000 + 15_001)).toBe(false);
     expect(fetches).toBe(2);
+  });
+});
+
+/**
+ * #4768. The flagships stay unconditionally visible, so their routing evidence has to have the
+ * opposite polarity from the account-gated set: only a CONFIRMED DENIAL counts, and it feeds an
+ * ordering preference rather than a refusal. These tests pin that polarity, because the failure
+ * mode of getting it wrong is #3022 -- a model disappearing from accounts that own it.
+ */
+describe("cached per-account denials for always-visible natives", () => {
+  test("an account whose confirmed roster omits the model is denied", () => {
+    const now = 1_800_000_000_000;
+    seedCodexModelEntitlementsForTests("plus", [SOL, ASTRA], now, TEST_CLIENT_VERSION);
+    seedCodexModelEntitlementsForTests("free", ["gpt-5.5"], now, TEST_CLIENT_VERSION);
+
+    expect([...(cachedDeniedCodexAccountIdsForModel(ASTRA, now) ?? [])]).toEqual(["free"]);
+  });
+
+  test("no evidence and no denial both answer undefined, never an empty set", () => {
+    const now = 1_800_000_000_000;
+    // Nothing cached at all.
+    expect(cachedDeniedCodexAccountIdsForModel(ASTRA, now)).toBeUndefined();
+
+    // Cached, confirmed, and granting: still undefined, so a caller cannot read "no denials"
+    // as "no candidates".
+    seedCodexModelEntitlementsForTests("plus", [ASTRA], now, TEST_CLIENT_VERSION);
+    expect(cachedDeniedCodexAccountIdsForModel(ASTRA, now)).toBeUndefined();
+  });
+
+  test("an expired entry is unknown rather than a denial", () => {
+    const now = 1_800_000_000_000;
+    seedCodexModelEntitlementsForTests("free", ["gpt-5.5"], now, TEST_CLIENT_VERSION);
+
+    expect([...(cachedDeniedCodexAccountIdsForModel(ASTRA, now) ?? [])]).toEqual(["free"]);
+    // Five-minute roster TTL. Past it the entry answers for a window that has closed.
+    expect(cachedDeniedCodexAccountIdsForModel(ASTRA, now + 5 * 60_000 + 1)).toBeUndefined();
+  });
+
+  /**
+   * Sol carries a measured minimum client version, so a roster fetched under an older client
+   * legitimately omits it without that being a denial. This is the #3022 guard, reached through
+   * the new reader: it must inherit the tri-state rule rather than restate a simpler one.
+   */
+  test("a roster fetched under too old a client is unknown, not denied", () => {
+    const now = 1_800_000_000_000;
+    seedCodexModelEntitlementsForTests("free", ["gpt-5.5"], now, "0.143.0");
+
+    expect(cachedDeniedCodexAccountIdsForModel(SOL, now)).toBeUndefined();
+    // Astra has no measured minimum, so the same roster IS a denial for it. Asserted here so the
+    // test above proves the version rule rather than the roster simply being ignored.
+    expect([...(cachedDeniedCodexAccountIdsForModel(ASTRA, now) ?? [])]).toEqual(["free"]);
+  });
+
+  test("a grant under one client version clears a denial recorded under another", () => {
+    const now = 1_800_000_000_000;
+    seedCodexModelEntitlementsForTests("plus", ["gpt-5.5"], now, "0.143.0");
+    expect([...(cachedDeniedCodexAccountIdsForModel(ASTRA, now) ?? [])]).toEqual(["plus"]);
+
+    seedCodexModelEntitlementsForTests("plus", [ASTRA], now, TEST_CLIENT_VERSION);
+    expect(cachedDeniedCodexAccountIdsForModel(ASTRA, now)).toBeUndefined();
+  });
+
+  test("a model outside the always-visible set is not this reader's business", () => {
+    const now = 1_800_000_000_000;
+    seedCodexModelEntitlementsForTests("free", ["gpt-5.5"], now, TEST_CLIENT_VERSION);
+
+    // Daybreak is account-gated: it fails closed through the eligibility path instead.
+    expect(cachedDeniedCodexAccountIdsForModel(DAYBREAK, now)).toBeUndefined();
+    expect(cachedDeniedCodexAccountIdsForModel("gpt-5.5", now)).toBeUndefined();
+    expect(cachedDeniedCodexAccountIdsForModel(undefined, now)).toBeUndefined();
   });
 });

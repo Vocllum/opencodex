@@ -249,6 +249,10 @@ HTTP 400을 반환합니다. 두 경우 모두 날짜 제거나 다른 경로로
 
 ## `POST /v1/live`와 Realtime sideband
 
+아래 계정 연결 설명은 기존 Codex 클라이언트 기준입니다. 외부 API 키로 쓰는 받아쓰기와 GPT-Live는 [영문 음성 API 명세](/reference/proxy-formats/#streaming-dictation)를 따릅니다.
+
+Connections > API keys에는 받아쓰기와 실시간 음성 블록이 있습니다. 데이터 키는 입력란에만 잠시 유지됩니다. 받아쓰기는 선택한 파일을 전송하고, 음성 연결 확인은 마이크 없이 세션 응답을 기다립니다. 설정 표시는 실제 연결 성공을 뜻하지 않습니다.
+
 `POST /v1/live`는 ChatGPT/Codex App Frameless call-creation 표면을 받습니다.
 `POST /v1/realtime/calls`는 OpenAI Realtime call-creation 표면을 받습니다. opencodex는 적절한 OpenAI 계열
 경로를 선택하고, 업스트림 인증 모드에 맞게 call-creation 요청을 정규화한 뒤, 제한된 응답을 릴레이합니다.
@@ -267,8 +271,9 @@ call creation과 sideband join은 같은 OpenAI 계정으로 이루어져야 하
 거부합니다(`404`). 두 요청 모두 Codex의 `session-id`와 `thread-id` 헤더를 실어 보냅니다. Pool 모드는
 계정 선택을 그 쌍에 묶어 두므로(프로세스 로컬) 프록시에 도착한 join은 통화를 만든 계정을 그대로 쓰고,
 Direct 모드는 두 요청 모두 호출자의 현재 bearer를 전달합니다. 릴레이되는 클라이언트 헤더는 정확히
-`openai-alpha`, `x-session-id`, `session-id`, `thread-id`, `originator`, `x-oai-attestation`
-(`src/server/live.ts`의 `LIVE_CLIENT_PROTOCOL_HEADERS`)이며, `Authorization`과 ChatGPT 계정 id는
+`openai-alpha`, `x-session-id`, `session-id`, `thread-id`, `originator`, `x-oai-attestation`,
+`x-codex-turn-metadata`(`src/server/live.ts`의 `LIVE_CLIENT_PROTOCOL_HEADERS`)이며, 각 헤더는
+호출자가 보낸 경우에만 전달되고 프록시가 만들어 내지 않습니다. `Authorization`과 ChatGPT 계정 id는
 ChatGPT 경로에서 프록시가 소유합니다(Pool은 저장된 계정으로 교체, Direct는 검증된 호출자 bearer를 전달).
 API 키 프로바이더는 자체 bearer를 씁니다. Codex가 join을 프록시로 보내는 것은
 `experimental_realtime_ws_base_url`이 프록시를 가리킬 때뿐이며, `ocx start`가 이 키를
