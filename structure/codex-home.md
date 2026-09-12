@@ -223,3 +223,6 @@ a deliberate user choice:
 - Project-level Codex config that bypasses managed routing
   (`src/codex/project-config-warnings.ts`), surfaced by `ocx doctor` as a warning rather than an
   override.
+
+Codex display-cache expiry, retained main-policy evidence, and reset history follow the
+[quota cache contract](providers/openai-tiers.md#quota-cache-and-short-window-history).

@@ -195,3 +195,6 @@ Claude ModelInfo ordering receives optional `{ modelPickerOrder, featured }` aft
 It orders routed output groups after alias deduplication, preserving the collision winner and
 base/1M/Fast siblings. Native groups and explicit Desktop profile ownership are unchanged.
 Native Codex advertisements still follow display priority; private guidance ranks do not freeze them.
+
+Codex display-cache expiry, retained main-policy evidence, and reset history follow the
+[quota cache contract](providers/openai-tiers.md#quota-cache-and-short-window-history).

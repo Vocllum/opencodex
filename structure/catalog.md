@@ -261,3 +261,6 @@ provider wire mapping; unpinned native requests retain their existing pass-throu
 > Decision record: [ADR-0025](decisions/ADR-0025-ultra-reasoning-level.md)
 
 > Decision record: [ADR-0026](decisions/ADR-0026-ultra-reasoning-level.md)
+
+Codex display-cache expiry, retained main-policy evidence, and reset history follow the
+[quota cache contract](providers/openai-tiers.md#quota-cache-and-short-window-history).

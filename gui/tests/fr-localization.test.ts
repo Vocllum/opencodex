@@ -147,6 +147,9 @@ const INTENTIONAL_ENGLISH = new Set<TKey>([
   "debug.streamInjection",
   "storage.trash.col.mode",
   "modal.badge.local",
+  // The catalog tab beside the badge, and the same word in French for the same reason:
+  // a Local tab labelled anything else would not match the Local badge on its own rows.
+  "modal.tab.local",
   "modal.badge.direct",
   "pws.rail.suffixLocal",
   "pws.filterType",

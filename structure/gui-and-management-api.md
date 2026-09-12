@@ -282,6 +282,12 @@ recovery; operators no longer need to delete `update-job.json` after a dead work
 The dashboard is a local control surface, not a separate service. It should reflect the same config
 and catalog invariants documented in this folder rather than inventing parallel state.
 
+Codex quota cards consume the display cache from `src/codex/quota.ts`. A partial refresh
+removes an omitted short tuple whose reset deadline has elapsed, so a stale Spark-derived
+5h row does not persist on a weekly-only account. This is independent of the main-account
+hard-lock evidence and reset-notification history; their retention rules are documented in
+[OpenAI account modes](providers/openai-tiers.md#quota-cache-and-short-window-history).
+
 ## Dashboard surfaces
 
 Provider Overview consumes the existing shared `add-provider-presets` resource for sponsor
@@ -302,7 +308,7 @@ single forms, and the shell pattern is the part worth keeping stable:
 | Storage | Rail plus cleanup and trash detail (`gui/src/components/storage-workspace/`). |
 | Subagents | Featured-roster selection workspace (`gui/src/components/subagents-workspace/`). |
 | Combos | Rail, detail panel, and an add flow (`gui/src/components/ComboWorkspace.tsx`). |
-| Add provider | Catalog browser plus form and OAuth panes (`gui/src/components/provider-catalog/`, `gui/src/components/AddProviderModal.tsx`). |
+| Add provider | Catalog browser plus form and OAuth panes (`gui/src/components/provider-catalog/`, `gui/src/components/AddProviderModal.tsx`). The catalog browses four tabs — Accounts, Free, Local, Paid — where Local is a catalog-only bucket peeled out of `bucketPresets` after `presetTier` has classified; the workspace `providerTier` stays three-way, so the rail, the free-paid sort and the Free count still treat a local runtime as free. Search sits above the tabs and reaches every tab at once: while a query is live the list renders all four groups with headings and the strip becomes jump chips with counts rather than a tablist, because moving the selected tab would change the row kind under the user (a preset-select button becomes a login row). The tab strip wraps within narrow modals. Every nonempty note has a full-text button so narrow rows never hide content permanently; the native note dialog closes during teardown and restores focus to its trigger. Provider notes clamp to two lines and open in full in a stacked native `<dialog>` owned by `AddProviderModal`, which also owns the search text so its `window` Escape handler can unwind popup, then query, then dialog. |
 | Codex accounts | Account pool cards, add-account flow, switch and reset modals (`gui/src/components/CodexAccountPool.tsx`, `gui/src/components/AddCodexAccountModal.tsx`), plus the generic account-targeting picker opt-in on `gui/src/pages/codex-set-multiauth.tsx`. Add/delete/login completion is projected to one boolean before presentation; pending catalog work is a warning, not a failed account mutation. |
 | Dashboard overview | Overview, Providers, and Models tabs at the page level (`gui/src/pages/Dashboard.tsx`), the 30-day token and coverage stats in the overview head (`gui/src/pages/dashboard-overview-head.tsx`), and the effort-cap, injection, maintenance, sidecar, and memory panels below it (`gui/src/pages/dashboard-overview-panels.tsx`). |
 

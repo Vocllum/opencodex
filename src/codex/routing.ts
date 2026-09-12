@@ -18,7 +18,7 @@ import {
   seedPoolRotationAccount,
   selectPriorityTier,
 } from "./pool-rotation";
-import { CODEX_EXHAUSTED_USAGE_PERCENT, CODEX_UNKNOWN_USAGE_SCORE, getAccountQuota } from "./quota";
+import { CODEX_EXHAUSTED_USAGE_PERCENT, CODEX_UNKNOWN_USAGE_SCORE, getAccountQuota, resetAtToMs } from "./quota";
 import { codexPlanKey, isThirtyDayOnlyCodexPlan } from "./plan";
 import {
   MAIN_CODEX_ACCOUNT_ID,
@@ -429,9 +429,11 @@ export function computeCodexUsageScore(quota: {
  * A short-only reading that proves the account is blocked NOW.
  *
  * Freshness is not optional. `getAccountQuota` performs no expiry check, partial updates
- * carry the old short tuple forward, and disk hydration accepts a persisted reading for
+ * carry a still-open short tuple forward, and disk hydration accepts a persisted reading for
  * hours — so scoring 100 from `shortPercent` alone would keep excluding an account whose
- * five-hour window has since reset. That is #3029 pointed the other way: the issue is that
+ * five-hour window has since reset. Merge no longer carries an elapsed shortResetAt, but an
+ * explicit incoming elapsed tuple is still stored, and a missing reset cannot be aged there.
+ * That is #3029 pointed the other way: the issue is that
  * an exhausted account stays selected, and "a recovered account stays excluded" trades one
  * unusable pool for another.
  *
@@ -457,12 +459,9 @@ function isTerminalShortWindow(
     const age = now - observedAt;
     return age >= 0 && age <= TERMINAL_SHORT_WINDOW_FRESHNESS_MS;
   }
-  // Both units reach storage: `normalizeResetAt` does not scale, and the GUI disambiguates
-  // by magnitude at read time. A comparison written against one assumption is off by 1000x
-  // against the other, and in the seconds-read-as-milliseconds direction every terminal
-  // reading looks like it reset in 1970 — a fix that passes its own test and does nothing.
-  const resetAtMs = resetAt < 10_000_000_000 ? resetAt * 1000 : resetAt;
-  return resetAtMs > now;
+  // Seconds and milliseconds both reach storage, so the split lives in one place next to the
+  // merge that also ages a stored reset instant (`resetAtToMs`, src/codex/quota.ts).
+  return resetAtToMs(resetAt) > now;
 }
 
 export function classifyCodexUpstreamOutcome(

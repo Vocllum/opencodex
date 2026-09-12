@@ -151,6 +151,27 @@ ordinary Luna or another account. Native vision/search helpers and standalone se
 under this compatibility opt-in; ordinary helper/default behavior is unchanged.
 Upstream remains the entitlement authority.
 
+### Quota cache and short-window history
+
+`src/codex/quota.ts` drops an omitted account-level short tuple from the display/rotation
+cache when its stored reset instant has elapsed. Seconds and milliseconds are accepted;
+future or missing deadlines remain carried, and explicit incoming short readings remain stored.
+This stops partial weekly/Spark or credits-only refreshes from renewing obsolete Spark-derived
+5h rows through the cache-wide `updatedAt` timestamp. Plan labels do not suppress real windows.
+
+The separately retained main-policy snapshot preserves omitted short evidence even after its
+reset clock passes. Credits-only, weekly-only, and metadata-only updates cannot remove an
+existing short usage reading or release its hard lock; a fresh short reading can replace it.
+
+The Codex writer explicitly asks `src/quota/reset-observer.ts` to retain an absent short window
+in `src/quota/reset-seen-store.ts`, with its original observation time. Detection compares only
+incoming windows, so eviction emits nothing and a later real rollover still has its baseline.
+Account cleanup forgets that baseline; other provider writers keep replacement semantics.
+Auto-refresh uses its separately retained reset boundary after display eviction.
+Regression coverage lives in `tests/codex-integration/codex-quota-parser-parity.test.ts`,
+`tests/codex-integration/main-account-hard-lock-policy.test.ts`,
+`tests/usage/quota-reset-observation.test.ts`, and `tests/usage/quota-reset-seen-store.test.ts`.
+
 `codexMainAccountHardLock` is a separate opt-in local admission policy, off by default.
 It blocks newly admitted identity-matched main-account requests at 99% of the 5h/short window
 when present, otherwise the weekly window (monthly for monthly-only accounts). It does not take
