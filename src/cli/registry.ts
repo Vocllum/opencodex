@@ -108,28 +108,51 @@ export const CLI_COMMANDS: CliCommandEntry[] = [
     ],
   },
   {
+    name: "remote-workspace",
+    usage: "ocx remote-workspace <pair|agent|status>",
+    summary: "Pair this OCX-only computer with a hub and run its remote workspace executor.",
+    details: [
+      "Pair: ocx remote-workspace pair <hub-url> --pairing-code-stdin --root <absolute-path> [--toolchain-root <absolute-directory>] [--executor-helper <absolute-file>] [--name <device-name>]",
+      "Agent: ocx remote-workspace agent",
+      "Status: ocx remote-workspace status [--json]",
+      "Codex, Claude Code, Pi, provider logins, and API keys remain on the hub; only workspace tools execute here.",
+    ],
+  },
+  {
     name: "disconnect",
     usage: "ocx disconnect [--keep-catalog] [--json]",
     summary: "Restore local client state offline and clear the remote-hub connection.",
   },
   {
     name: "sync",
-    usage: "ocx sync [--restart-codex] [--restart-desktop-app]",
+    usage: "ocx sync [--restart-codex] [--restart-app-server-only]",
     summary: "Fetch provider models and inject them into Codex config.",
     details: [
       "After writing the catalog, warns if long-lived Codex app-server processes are still running.",
-      "--restart-codex sends SIGTERM only to matching app-server / code-mode-host processes (may interrupt active turns).",
-      "--restart-desktop-app (Windows only, opt-in) fully restarts the Codex desktop app so its model picker re-reads the catalog. Never implied by --restart-codex: it ends live conversations.",
+      "--restart-codex restarts the app-servers AND fully quits and relaunches the Codex desktop app on macOS, Linux and Windows, so its model picker re-reads the catalog. It ends live conversations.",
+      "--restart-app-server-only keeps the narrow behaviour: SIGTERM to matching app-server / code-mode-host processes, desktop app left running. It wins over --restart-codex when both are given.",
+      "--restart-desktop-app is a deprecated alias of --restart-codex and prints a notice.",
     ],
   },
   {
     name: "sync-cache",
-    usage: "ocx sync-cache [--restart-codex] [--restart-desktop-app]",
+    usage: "ocx sync-cache [--restart-codex] [--restart-app-server-only]",
     summary: "Refresh Codex's model cache from the active catalog.",
     details: [
       "Warns when Codex app-server processes still hold an in-memory model list.",
-      "--restart-codex sends SIGTERM only to matching app-server / code-mode-host processes (may interrupt active turns).",
-      "--restart-desktop-app (Windows only, opt-in) fully restarts the Codex desktop app so its model picker re-reads the catalog. Never implied by --restart-codex: it ends live conversations.",
+      "--restart-codex restarts the app-servers AND fully quits and relaunches the Codex desktop app on macOS, Linux and Windows, so its model picker re-reads the catalog. It ends live conversations.",
+      "--restart-app-server-only keeps the narrow behaviour: SIGTERM to matching app-server / code-mode-host processes, desktop app left running. It wins over --restart-codex when both are given.",
+      "--restart-desktop-app is a deprecated alias of --restart-codex and prints a notice.",
+    ],
+  },
+  {
+    name: "catalog",
+    usage: "ocx catalog pull <https-url> [--auth-env <NAME>] [--json] [--restart-codex] [--restart-app-server-only]",
+    summary: "Install a validated remote /v1/catalog snapshot into Codex.",
+    details: [
+      "Authentication is read only from the named environment variable and sent as a Bearer token.",
+      "HTTPS is required except for loopback HTTP; redirects are refused.",
+      "The catalog and models_cache.json are coordinated under the Codex catalog write lock.",
     ],
   },
   { name: "status", usage: "ocx status", summary: "Check proxy server status." },
@@ -152,7 +175,16 @@ export const CLI_COMMANDS: CliCommandEntry[] = [
       "Env default: OCX_DEBUG=1 (legacy OCX_DEBUG_FRAMES still works)",
     ],
   },
-  { name: "login", usage: "ocx login <provider>", summary: "OAuth or API-key login for a provider." },
+  {
+    name: "login",
+    usage: "ocx login <provider>",
+    summary: "OAuth or API-key login for a provider.",
+    details: [
+      "Codex/ChatGPT: ocx login codex runs the Codex account-pool login (same flow as ocx account login codex).",
+      "That one needs a running proxy; the OAuth and API-key providers log in locally.",
+      "'chatgpt' and 'openai' are the same route; an OpenAI platform API key is 'ocx login openai-apikey'.",
+    ],
+  },
   { name: "logout", usage: "ocx logout <provider>", summary: "Remove a stored provider login." },
   {
     name: "gui",
@@ -212,7 +244,7 @@ export const CLI_COMMANDS: CliCommandEntry[] = [
   },
   {
     name: "account",
-    usage: "ocx account <list|current|use|refresh|auto-switch|priority|login|reauth|code|cancel|remove|add-key|reset-credits|main> ...",
+    usage: "ocx account <list|current|use|refresh|auto-switch|priority|login|reauth|code|cancel|remove|add-key|reset-credits|grok-reset-coupons|main> ...",
     summary: "List and switch provider accounts and API-key pools (GUI parity).",
     details: [
       "list [provider]     Codex account pool, OAuth accounts and API keys (identifiers shown masked as the API returns them).",
@@ -225,6 +257,7 @@ export const CLI_COMMANDS: CliCommandEntry[] = [
       "add-key <provider> [--label <label>]  Add a key read only from piped stdin.",
       "login/reauth/code/cancel  Run browser or manual-code auth from a headless shell.",
       "reset-credits <id|main> [--consume --yes]  Inspect or consume Codex reset credits.",
+      "grok-reset-coupons [<id>] [--consume --yes] Inspect or redeem Grok reset coupons.",
       "main <subcommand>     Manage the physical native Codex login separately from Pool routing.",
       "Switching the active account takes effect immediately; running threads move on their next request, and in-flight requests keep the account they captured.",
       "A selection-order change applies from the next unbound request and never moves a bound thread.",
@@ -328,11 +361,12 @@ export const CLI_COMMANDS: CliCommandEntry[] = [
   { name: "api-key", usage: "ocx api-key <list|create|rotate|remove> ...", summary: "Alias of ocx access key." },
   {
     name: "export",
-    usage: "ocx export --client <opencode|pi|omp|hermes|openclaw|kimi|gajae|dsh|mcode|zcode|prime|aside|raycast> [--json] [--out <path>] [--force]",
-    summary: "Print a client config (OpenCode, Pi, OMP, Hermes, OpenClaw, Kimi Code, Gajae Code, DeepSeek Harness, MiniMax Code, ZCode, Prime Agent, Aside, Raycast) wired to the running proxy.",
+    usage: "ocx export --client <opencode|pi|omp|hermes|openclaw|kimi|gajae|dsh|mcode|zcode|prime|aside|raycast|omo|cline> [--json] [--out <path>] [--force]",
+    summary: "Print a client config (OpenCode, Pi, OMP, Hermes, OpenClaw, Kimi Code, gjc, DeepSeek Harness, MiniMax Code, ZCode, Prime Agent, Aside, Raycast, omo, Cline) wired to the running proxy.",
     details: [
       "--json prints the generated document as JSON on stdout; use --out for the client's native format.",
       "--out <path> writes the native config there and refuses to replace an existing file without --force.",
+      "Cline exports a two-document bundle: settings for providers.json and catalog for sibling models.json. Use integration client enable --client cline for a journaled write.",
       "The config never contains a real key; it carries a documented env reference or a non-secret loopback placeholder.",
       "The destination path is printed for merging by hand — ocx never writes your real client config.",
     ],
