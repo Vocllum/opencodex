@@ -222,7 +222,16 @@ function truncateUsageLedger(ledgerPath: string, maxBytes: number): void {
         // Confirmed corrupt/invalid single line: discard by writing empty file
         retainedEnd = 0;
       } else {
-        retainedEnd = foundLastLf;
+        // An older LF-terminated row exists, but the file tail lacks a trailing newline.
+        // Validate [foundLastLf, fileSize) to see if it is a complete valid JSON record.
+        const tailValidation = validateRangeUsageRow(inFd, foundLastLf, fileSize);
+        if (tailValidation === "valid") {
+          retainedEnd = fileSize;
+        } else if (tailValidation === "unverifiable") {
+          return; // Cannot prove invalidity; leave ledger unchanged
+        } else {
+          retainedEnd = foundLastLf; // Discard partial/crash tail
+        }
       }
     }
 

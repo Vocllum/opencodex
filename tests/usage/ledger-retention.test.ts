@@ -264,6 +264,30 @@ describe("ledger-retention", () => {
       expect(statSync(ledgerPath).size).toBe(Buffer.byteLength(hugeRow, "utf-8"));
     });
 
+    test("preserves valid unterminated final row following older complete rows", () => {
+      const limit = 2048;
+      setUsageLedgerMaxBytesUnsafe(limit);
+
+      const oldRows = Array.from({ length: 25 }, (_, i) => makeRow(`old-${i}`, 100)).join("");
+      // A valid JSON row without a trailing newline
+      const finalUnterminated = JSON.stringify({
+        requestId: "final-valid",
+        timestamp: Date.now(),
+        provider: "openai",
+        model: "gpt-4",
+        totalCost: 0.01,
+      });
+      writeFileSync(ledgerPath, oldRows + finalUnterminated);
+      expect(statSync(ledgerPath).size).toBeGreaterThan(limit);
+
+      enforceUsageLedgerSizeLimit(ledgerPath);
+
+      const content = readFileSync(ledgerPath, "utf-8");
+      // The valid final row must not be discarded
+      expect(content).toContain("final-valid");
+      expect(content.endsWith(finalUnterminated)).toBe(true);
+    });
+
     test("deletes routing-history.sqlite after truncation", () => {
       const limit = 2048;
       setUsageLedgerMaxBytesUnsafe(limit);
