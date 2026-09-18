@@ -965,7 +965,7 @@ export const fr: Record<TKey, string> = {
   "usage.retention.unlimited": "Illimitée",
     "usage.retention.loadError": "Impossible de charger la limite de l’historique d’utilisation.",
 "usage.retention.error": "Impossible de mettre à jour la limite de l’historique d’utilisation.",
-  "usage.retention.disabled": "Illimitée — la compression automatique de l’historique est désactivée.",
+  "usage.retention.disabled": "Illimitée — la suppression automatique de l’historique est désactivée.",
 "usage.title": "Utilisation",
   "usage.subtitle": "Comptabilisation locale des jetons par votre proxy. Une utilisation manquante n’est jamais affichée comme nulle.",
   "usage.loading": "Chargement des données d’utilisation…",

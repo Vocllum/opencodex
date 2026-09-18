@@ -22,7 +22,7 @@ let ledgerPath = "";
 
 /** Build a JSONL row of approximately `bytes` total (including the trailing LF). */
 function makeRow(id: string, paddingBytes = 0): string {
-  const base = JSON.stringify({ requestId: id, timestamp: Date.now(), model: "gpt-4", totalCost: 0.01 });
+  const base = JSON.stringify({ requestId: id, timestamp: Date.now(), provider: "openai", model: "gpt-4", totalCost: 0.01 });
   if (paddingBytes <= 0) return base + "\n";
   // Pad with spaces inside the JSON (valid JSON, just has a long string value).
   const needed = paddingBytes - base.length - 1; // -1 for the trailing LF
@@ -30,6 +30,7 @@ function makeRow(id: string, paddingBytes = 0): string {
   const padded = JSON.stringify({
     requestId: id,
     timestamp: Date.now(),
+    provider: "openai",
     model: "gpt-4",
     totalCost: 0.01,
     _pad: "x".repeat(Math.max(0, needed - 10)), // rough; exact size doesn't matter
@@ -229,6 +230,23 @@ describe("ledger-retention", () => {
 
       // Should be truncated to an empty file (invalid partial tail discarded)
       expect(statSync(ledgerPath).size).toBe(0);
+    });
+
+    test("discards older rows and retains valid oversized newest row", () => {
+      const limit = MIN_USAGE_LEDGER_MAX_BYTES; // 1 MiB
+      setUsageLedgerMaxBytes(limit);
+
+      const oldRows = [makeRow("old-1", 100), makeRow("old-2", 100)].join("");
+      const newestOversized = makeRow("newest-oversized", limit + 10_000);
+      writeFileSync(ledgerPath, oldRows + newestOversized);
+      expect(statSync(ledgerPath).size).toBeGreaterThan(limit + 10_000);
+
+      enforceUsageLedgerSizeLimit(ledgerPath);
+
+      // Older rows discarded, only the newest valid oversized row is kept
+      const content = readFileSync(ledgerPath, "utf-8");
+      expect(content).toBe(newestOversized);
+      expect(content).not.toContain("old-1");
     });
 
     test("deletes routing-history.sqlite after truncation", () => {

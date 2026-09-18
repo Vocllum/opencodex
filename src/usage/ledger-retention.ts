@@ -13,7 +13,10 @@
  *    the entire maxBytes buffer in memory.
  *  - Only complete JSONL rows are retained; partial/torn tails are discarded.
  *  - A valid single oversized row (larger than the limit) is preserved.
- *    An invalid/unterminated oversized crash tail is discarded.
+ *    If the newest row is oversized, earlier rows are discarded and the newest
+ *    row is validated: retained if valid, discarded if corrupt.
+ *  - Copy loop retries partial writeSync calls and calls fsyncSync on the temp
+ *    descriptor before atomic rename.
  *  - Atomic replace via rename prevents data loss on crash.
  *  - Invalidation: discards in-memory usage snapshot and deletes derived sqlite index.
  *  - Best-effort: failures are logged/swallowed so request paths never fail.
@@ -23,6 +26,7 @@
 import {
   closeSync,
   fstatSync,
+  fsyncSync,
   openSync,
   readSync,
   writeSync,
@@ -110,6 +114,32 @@ function isValidUsageRow(line: string): boolean {
   }
 }
 
+/** Validate a byte range in an open fd as a complete valid usage row. */
+function isRangeValidUsageRow(fd: number, start: number, end: number): boolean {
+  const len = end - start;
+  if (len <= 0 || len > 10 * 1024 * 1024) return false;
+  const buf = Buffer.allocUnsafe(len);
+  let off = 0;
+  while (off < len) {
+    const r = readSync(fd, buf, off, len - off, start + off);
+    if (r === 0) break;
+    off += r;
+  }
+  if (off !== len) return false;
+  const text = buf.toString("utf-8");
+  return isValidUsageRow(text);
+}
+
+/** Write all bytes from buffer to fd, retrying partial writes. */
+function writeAllSync(fd: number, buf: Buffer, length: number): void {
+  let written = 0;
+  while (written < length) {
+    const count = writeSync(fd, buf, written, length - written);
+    if (count === 0) throw new Error("zero-byte write in ledger retention");
+    written += count;
+  }
+}
+
 /**
  * Read the ledger with bounded memory to find the newest complete JSONL rows
  * fitting within `maxBytes`, write them to a temp file, and atomically replace.
@@ -152,18 +182,8 @@ function truncateUsageLedger(ledgerPath: string, maxBytes: number): void {
 
       if (foundLastLf === -1) {
         // No newline anywhere in the entire file.
-        // If it's valid usage JSON (e.g. single line without trailing LF), keep it.
-        // Otherwise it's corrupt crash data — discard by writing empty file.
-        const entireLine = fileSize <= 10 * 1024 * 1024 // Only parse if reasonable size
-          ? (() => {
-              const b = Buffer.allocUnsafe(fileSize);
-              readSync(inFd, b, 0, fileSize, 0);
-              return b.toString("utf-8");
-            })()
-          : null;
-
-        if (entireLine && isValidUsageRow(entireLine)) {
-          return; // Valid oversized row, preserve original
+        if (isRangeValidUsageRow(inFd, 0, fileSize)) {
+          return; // Valid single oversized row, preserve original
         }
         // Invalid or corrupt single line: write empty file
         retainedEnd = 0;
@@ -198,13 +218,51 @@ function truncateUsageLedger(ledgerPath: string, maxBytes: number): void {
       }
 
       if (foundFirstLf === -1 || foundFirstLf >= retainedEnd) {
-        // The entire retained region is part of one giant line that spans > maxBytes.
-        // Check if the entire file is a single oversized valid row.
-        if (retainedEnd === fileSize) {
-          return; // Single oversized valid row, preserve as-is
+        // The newest complete row itself spans more than maxBytes (an oversized row).
+        // Find the start of this newest row by scanning backward from retainedEnd - 1.
+        let newestRowStart = 0;
+        let backOffset = retainedEnd - 1; // skip trailing LF of newest row
+        while (backOffset > 0) {
+          const chunkSize = Math.min(backOffset, SCAN_CHUNK_BYTES);
+          const buf = Buffer.allocUnsafe(chunkSize);
+          const bytesRead = readSync(inFd, buf, 0, chunkSize, backOffset - chunkSize);
+          if (bytesRead === 0) break;
+          const lfIdx = buf.subarray(0, bytesRead).lastIndexOf(0x0a);
+          if (lfIdx >= 0) {
+            newestRowStart = (backOffset - chunkSize) + lfIdx + 1;
+            break;
+          }
+          backOffset -= chunkSize;
         }
-        // Otherwise no complete rows could be kept
-        retainedStart = retainedEnd;
+
+        // Validate the newest oversized row
+        if (isRangeValidUsageRow(inFd, newestRowStart, retainedEnd)) {
+          if (newestRowStart === 0 && retainedEnd === fileSize) {
+            return; // Sole line in file is a valid oversized row; preserve file
+          }
+          // The newest row is valid: discard older rows and retain this newest row
+          retainedStart = newestRowStart;
+        } else {
+          // The newest oversized row is corrupt: discard it, keep earlier complete rows
+          retainedEnd = newestRowStart;
+          retainedStart = 0;
+          if (retainedEnd > maxBytes) {
+            // Re-apply maxBytes ceiling to the earlier valid prefix
+            retainedStart = Math.max(0, retainedEnd - maxBytes);
+            let sOffset = retainedStart;
+            let pFirstLf = -1;
+            while (sOffset < retainedEnd && pFirstLf === -1) {
+              const cSize = Math.min(retainedEnd - sOffset, SCAN_CHUNK_BYTES);
+              const b = Buffer.allocUnsafe(cSize);
+              const bRead = readSync(inFd, b, 0, cSize, sOffset);
+              if (bRead === 0) break;
+              const idx = b.subarray(0, bRead).indexOf(0x0a);
+              if (idx >= 0) pFirstLf = sOffset + idx + 1;
+              else sOffset += cSize;
+            }
+            retainedStart = (pFirstLf !== -1 && pFirstLf < retainedEnd) ? pFirstLf : 0;
+          }
+        }
       } else {
         retainedStart = foundFirstLf;
       }
@@ -224,17 +282,27 @@ function truncateUsageLedger(ledgerPath: string, maxBytes: number): void {
         const toRead = Math.min(retainedEnd - copyOffset, SCAN_CHUNK_BYTES);
         const bytesRead = readSync(inFd, copyBuffer, 0, toRead, copyOffset);
         if (bytesRead === 0) break;
-        writeSync(outFd, copyBuffer, 0, bytesRead);
+        writeAllSync(outFd, copyBuffer, bytesRead);
         copyOffset += bytesRead;
       }
     }
 
+    try { fsyncSync(outFd); } catch { /* best-effort */ }
     closeSync(outFd);
     outFd = undefined;
     closeSync(inFd);
     inFd = undefined;
 
     renameAtomicFile(tmpPath, ledgerPath, undefined, "usage-ledger-retention");
+
+    // Sync parent directory on POSIX platforms for crash durability
+    if (process.platform !== "win32") {
+      try {
+        const dirFd = openSync(dirname(ledgerPath), "r");
+        try { fsyncSync(dirFd); } finally { closeSync(dirFd); }
+      } catch { /* best-effort */ }
+    }
+
     discardRetainedUsageSnapshot();
     deleteRoutingHistoryIndex(ledgerPath);
   } catch {
