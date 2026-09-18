@@ -216,6 +216,21 @@ describe("ledger-retention", () => {
       }
     });
 
+    test("discards an oversized unterminated partial/corrupt line", () => {
+      const limit = MIN_USAGE_LEDGER_MAX_BYTES; // 1 MiB
+      setUsageLedgerMaxBytes(limit);
+
+      // Write a single oversized corrupt line without newline that is NOT valid JSON
+      const corruptData = "corrupt_data_without_newline_".repeat(50_000);
+      writeFileSync(ledgerPath, corruptData);
+      expect(statSync(ledgerPath).size).toBeGreaterThan(limit);
+
+      enforceUsageLedgerSizeLimit(ledgerPath);
+
+      // Should be truncated to an empty file (invalid partial tail discarded)
+      expect(statSync(ledgerPath).size).toBe(0);
+    });
+
     test("deletes routing-history.sqlite after truncation", () => {
       const limit = 2048;
       setUsageLedgerMaxBytesUnsafe(limit);

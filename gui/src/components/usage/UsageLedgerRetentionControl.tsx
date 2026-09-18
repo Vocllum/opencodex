@@ -84,7 +84,7 @@ export default function UsageLedgerRetentionControl({ apiBase }: { apiBase: stri
     const timeout = window.setTimeout(() => {
       void load(controller.signal).catch(errorValue => {
         if (!controller.signal.aborted && (errorValue as { name?: string })?.name !== "AbortError") {
-          setError(t("usage.retention.error"));
+          setError(t("usage.retention.loadError"));
         }
       });
     }, 0);

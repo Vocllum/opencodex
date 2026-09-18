@@ -76,7 +76,7 @@ test("retention control stays on Usage and out of Storage", async () => {
   const storageWorkspace = await Bun.file(new URL("../src/components/storage-workspace/StorageWorkspace.tsx", import.meta.url)).text();
 
   expect(page).toContain("UsageLedgerRetentionControl");
-  expect(storageWorkspace).not.toContain("UsageLedgerRetentionPanel");
+  expect(storageWorkspace).not.toContain("UsageLedgerRetentionControl");
 });
 
 test("renders one switch and toggles without rewriting the saved byte ceiling", async () => {

@@ -7,16 +7,17 @@
  * temporary file and atomically renamed over the original. The derived
  * `routing-history.sqlite` index is deleted so it auto-rebuilds on next query.
  *
- * Design constraints (from PR #4042 lessons):
+ * Design constraints (from PR #4042 lessons & CodeRabbit review):
+ *  - Memory usage stays bounded: uses backward chunk scanning (max 64 KiB chunks)
+ *    to find row boundaries, streaming/copying in chunks rather than allocating
+ *    the entire maxBytes buffer in memory.
  *  - Only complete JSONL rows are retained; partial/torn tails are discarded.
- *  - A single oversized row (larger than the limit) is kept as the sole row
- *    rather than producing an empty file.
+ *  - A valid single oversized row (larger than the limit) is preserved.
+ *    An invalid/unterminated oversized crash tail is discarded.
  *  - Atomic replace via rename prevents data loss on crash.
- *  - The retained snapshot uses `discardRetainedUsageSnapshot()` to invalidate
- *    the in-memory cache so the next management read re-parses.
- *  - Best-effort: failures are logged but never block the request path.
- *  - No scheduler, worker, or background lifecycle — runs inline after append.
- *  - A simple per-process flag prevents concurrent/re-entrant truncation.
+ *  - Invalidation: discards in-memory usage snapshot and deletes derived sqlite index.
+ *  - Best-effort: failures are logged/swallowed so request paths never fail.
+ *  - No scheduler or background worker: inline enforcement after append.
  */
 
 import {
@@ -24,20 +25,23 @@ import {
   fstatSync,
   openSync,
   readSync,
-  writeFileSync,
+  writeSync,
   chmodSync,
   unlinkSync,
   existsSync,
 } from "node:fs";
 import { join, dirname } from "node:path";
 import { renameAtomicFile } from "../lib/windows-atomic-replace";
-import { discardRetainedUsageSnapshot } from "./log";
+import { discardRetainedUsageSnapshot, normalizePersistedUsageRow } from "./log";
 
 /** Floor: retention limits below this are treated as unconfigured. */
 export const MIN_USAGE_LEDGER_MAX_BYTES = 1024 * 1024; // 1 MiB
 
 /** Default ceiling when enabled through the GUI (1 GiB). */
 export const DEFAULT_USAGE_LEDGER_MAX_BYTES = 1024 * 1024 * 1024; // 1 GiB
+
+/** Bounded chunk size for backward scanning and copying (64 KiB). */
+const SCAN_CHUNK_BYTES = 64 * 1024;
 
 let truncationInProgress = false;
 
@@ -97,95 +101,152 @@ export function enforceUsageLedgerSizeLimit(ledgerPath: string): void {
   }
 }
 
+/** Check if a line is a valid, parseable usage entry. */
+function isValidUsageRow(line: string): boolean {
+  try {
+    return normalizePersistedUsageRow(JSON.parse(line)) !== undefined;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Read the ledger backwards to find the newest complete JSONL rows fitting
- * within `maxBytes`, write them to a temp file, and atomically replace.
+ * Read the ledger with bounded memory to find the newest complete JSONL rows
+ * fitting within `maxBytes`, write them to a temp file, and atomically replace.
  */
 function truncateUsageLedger(ledgerPath: string, maxBytes: number): void {
-  // Read the entire file — we need to find complete line boundaries.
-  // The file is larger than maxBytes, so we only need to read the tail.
-  let fd: number | undefined;
-  try {
-    fd = openSync(ledgerPath, "r");
-    const stat = fstatSync(fd);
-    const fileSize = Number(stat.size);
+  let inFd: number | undefined;
+  let outFd: number | undefined;
+  const tmpPath = join(dirname(ledgerPath), `.usage-retention-${process.pid}.tmp`);
 
+  try {
+    inFd = openSync(ledgerPath, "r");
+    const fileSize = Number(fstatSync(inFd).size);
     if (fileSize <= maxBytes) return;
 
-    // Read the last `maxBytes` bytes to find rows to keep.
-    const readSize = Math.min(fileSize, maxBytes);
-    const readStart = fileSize - readSize;
-    const buffer = Buffer.allocUnsafe(readSize);
+    // Phase 1: Determine the valid retained range [retainedStart, retainedEnd)
+    // First, check the end of the file. If it doesn't end with LF, find the last LF.
+    let retainedEnd = fileSize;
+    const tailCheckSize = Math.min(fileSize, SCAN_CHUNK_BYTES);
+    const tailBuffer = Buffer.allocUnsafe(tailCheckSize);
+    const tailRead = readSync(inFd, tailBuffer, 0, tailCheckSize, fileSize - tailCheckSize);
 
-    let offset = 0;
-    while (offset < readSize) {
-      const read = readSync(fd, buffer, offset, readSize - offset, readStart + offset);
-      if (read === 0) return; // File changed underneath us; bail
-      offset += read;
-    }
-    closeSync(fd);
-    fd = undefined;
+    if (tailRead > 0 && tailBuffer[tailRead - 1] !== 0x0a) {
+      // Missing trailing newline: crash tail or unterminated line.
+      // Search backward for the last LF in the file.
+      let foundLastLf = -1;
+      let checkOffset = fileSize;
 
-    // Find the first complete line boundary in the buffer.
-    // If we started mid-file, skip forward to the first newline + 1.
-    let contentStart = 0;
-    if (readStart > 0) {
-      const firstNewline = buffer.indexOf(0x0a); // LF
-      if (firstNewline < 0) {
-        // The entire tail is one giant line. Keep it as-is (single oversized row).
-        contentStart = 0;
+      while (checkOffset > 0 && foundLastLf === -1) {
+        const chunkSize = Math.min(checkOffset, SCAN_CHUNK_BYTES);
+        const buf = Buffer.allocUnsafe(chunkSize);
+        const bytesRead = readSync(inFd, buf, 0, chunkSize, checkOffset - chunkSize);
+        if (bytesRead === 0) break;
+        const lastIdx = buf.subarray(0, bytesRead).lastIndexOf(0x0a);
+        if (lastIdx >= 0) {
+          foundLastLf = (checkOffset - chunkSize) + lastIdx + 1;
+        } else {
+          checkOffset -= chunkSize;
+        }
+      }
+
+      if (foundLastLf === -1) {
+        // No newline anywhere in the entire file.
+        // If it's valid usage JSON (e.g. single line without trailing LF), keep it.
+        // Otherwise it's corrupt crash data — discard by writing empty file.
+        const entireLine = fileSize <= 10 * 1024 * 1024 // Only parse if reasonable size
+          ? (() => {
+              const b = Buffer.allocUnsafe(fileSize);
+              readSync(inFd, b, 0, fileSize, 0);
+              return b.toString("utf-8");
+            })()
+          : null;
+
+        if (entireLine && isValidUsageRow(entireLine)) {
+          return; // Valid oversized row, preserve original
+        }
+        // Invalid or corrupt single line: write empty file
+        retainedEnd = 0;
       } else {
-        contentStart = firstNewline + 1;
+        retainedEnd = foundLastLf;
       }
     }
 
-    // Validate that we have at least one complete row.
-    // A complete row ends with LF. If the buffer has no LF after contentStart,
-    // the whole thing is one incomplete line — keep the original file.
-    const content = buffer.subarray(contentStart);
-    if (content.length === 0) return;
+    // Now determine retainedStart so that (retainedEnd - retainedStart) <= maxBytes
+    // and retainedStart sits right after an LF (complete row boundary).
+    let retainedStart = 0;
+    const targetLength = retainedEnd;
 
-    // Check for incomplete trailing line (no trailing newline).
-    // If the file ends with a newline, all rows are complete.
-    // If not, we need to strip the partial trailing line.
-    let endOffset = content.length;
-    if (content[endOffset - 1] !== 0x0a) {
-      // Find the last newline — everything after it is an incomplete row.
-      const lastNewline = content.lastIndexOf(0x0a);
-      if (lastNewline < 0) {
-        // No complete row at all. This is a single oversized line.
-        // Keep the original file intact rather than producing an empty file.
-        return;
+    if (targetLength > maxBytes) {
+      const minStart = retainedEnd - maxBytes;
+      // We need to scan forward from minStart to find the first LF,
+      // so the retained region starts at that LF + 1.
+      let scanOffset = minStart;
+      let foundFirstLf = -1;
+
+      while (scanOffset < retainedEnd && foundFirstLf === -1) {
+        const chunkSize = Math.min(retainedEnd - scanOffset, SCAN_CHUNK_BYTES);
+        const buf = Buffer.allocUnsafe(chunkSize);
+        const bytesRead = readSync(inFd, buf, 0, chunkSize, scanOffset);
+        if (bytesRead === 0) break;
+        const firstIdx = buf.subarray(0, bytesRead).indexOf(0x0a);
+        if (firstIdx >= 0) {
+          foundFirstLf = scanOffset + firstIdx + 1;
+        } else {
+          scanOffset += chunkSize;
+        }
       }
-      endOffset = lastNewline + 1;
+
+      if (foundFirstLf === -1 || foundFirstLf >= retainedEnd) {
+        // The entire retained region is part of one giant line that spans > maxBytes.
+        // Check if the entire file is a single oversized valid row.
+        if (retainedEnd === fileSize) {
+          return; // Single oversized valid row, preserve as-is
+        }
+        // Otherwise no complete rows could be kept
+        retainedStart = retainedEnd;
+      } else {
+        retainedStart = foundFirstLf;
+      }
     }
 
-    const retained = content.subarray(0, endOffset);
+    const retainedBytes = retainedEnd - retainedStart;
 
-    // Write to a temp file next to the ledger, then atomic rename.
-    const tmpPath = join(dirname(ledgerPath), `.usage-retention-${process.pid}.tmp`);
-    try {
-      writeFileSync(tmpPath, retained, { mode: 0o600 });
-      try { chmodSync(tmpPath, 0o600); } catch { /* best-effort */ }
-      renameAtomicFile(tmpPath, ledgerPath, undefined, "usage-ledger-retention");
+    // Phase 2: Copy [retainedStart, retainedEnd) to tmpPath in bounded chunks
+    outFd = openSync(tmpPath, "w", 0o600);
+    try { chmodSync(tmpPath, 0o600); } catch { /* best-effort */ }
 
-      // Invalidate in-memory caches so readers re-parse.
-      discardRetainedUsageSnapshot();
+    if (retainedBytes > 0) {
+      let copyOffset = retainedStart;
+      const copyBuffer = Buffer.allocUnsafe(SCAN_CHUNK_BYTES);
 
-      // Delete the derived routing-history index so it auto-rebuilds.
-      // The indexer detects source identity changes (inode may change on rename)
-      // and triggers a full rebuild automatically, but deleting it is explicit
-      // and avoids a stale offset pointing past the truncated file.
-      deleteRoutingHistoryIndex(ledgerPath);
-    } catch {
-      // Clean up the temp file on failure.
-      try { unlinkSync(tmpPath); } catch { /* ignore */ }
-      // Failure is tolerated: the ledger is still intact (append succeeded),
-      // and the next append will retry truncation.
+      while (copyOffset < retainedEnd) {
+        const toRead = Math.min(retainedEnd - copyOffset, SCAN_CHUNK_BYTES);
+        const bytesRead = readSync(inFd, copyBuffer, 0, toRead, copyOffset);
+        if (bytesRead === 0) break;
+        writeSync(outFd, copyBuffer, 0, bytesRead);
+        copyOffset += bytesRead;
+      }
     }
+
+    closeSync(outFd);
+    outFd = undefined;
+    closeSync(inFd);
+    inFd = undefined;
+
+    renameAtomicFile(tmpPath, ledgerPath, undefined, "usage-ledger-retention");
+    discardRetainedUsageSnapshot();
+    deleteRoutingHistoryIndex(ledgerPath);
+  } catch {
+    // Failure is tolerated; clean up temp file if present
+    try { unlinkSync(tmpPath); } catch { /* ignore */ }
   } finally {
-    if (fd !== undefined) {
-      try { closeSync(fd); } catch { /* ignore */ }
+    if (inFd !== undefined) {
+      try { closeSync(inFd); } catch { /* ignore */ }
+    }
+    if (outFd !== undefined) {
+      try { closeSync(outFd); } catch { /* ignore */ }
+      try { unlinkSync(tmpPath); } catch { /* ignore */ }
     }
   }
 }

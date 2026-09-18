@@ -155,6 +155,7 @@ export async function handleStorageLogGuardRoutes(ctx: ManagementContext): Promi
       maxBytes = config.usageLedgerMaxBytes;
     }
 
+    const previousMaxBytes = config.usageLedgerMaxBytes;
     if (candidate.enabled) {
       config.usageLedgerMaxBytes = maxBytes;
       setUsageLedgerMaxBytes(maxBytes);
@@ -167,6 +168,8 @@ export async function handleStorageLogGuardRoutes(ctx: ManagementContext): Promi
     try {
       persistConfig(config);
     } catch {
+      config.usageLedgerMaxBytes = previousMaxBytes;
+      setUsageLedgerMaxBytes(previousMaxBytes);
       return jsonResponse({ error: "config_write_failed" }, 500, req, config);
     }
 
