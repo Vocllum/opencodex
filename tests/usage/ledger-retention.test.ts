@@ -264,7 +264,7 @@ describe("ledger-retention", () => {
       expect(statSync(ledgerPath).size).toBe(Buffer.byteLength(hugeRow, "utf-8"));
     });
 
-    test("preserves valid unterminated final row following older complete rows", () => {
+    test("preserves valid unterminated final row following older complete rows and appends newline", () => {
       const limit = 2048;
       setUsageLedgerMaxBytesUnsafe(limit);
 
@@ -285,7 +285,8 @@ describe("ledger-retention", () => {
       const content = readFileSync(ledgerPath, "utf-8");
       // The valid final row must not be discarded
       expect(content).toContain("final-valid");
-      expect(content.endsWith(finalUnterminated)).toBe(true);
+      // And must now be properly terminated with LF so future appends don't merge
+      expect(content.endsWith(finalUnterminated + "\n")).toBe(true);
     });
 
     test("deletes routing-history.sqlite after truncation", () => {

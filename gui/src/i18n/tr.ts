@@ -976,7 +976,7 @@ export const tr: Record<TKey, string> = {
     "usage.retention.loadError": "Kullanım geçmişi boyut sınırı yüklenemedi.",
   "usage.retention.invalid": "1 ile {max} MiB arasında bir boyut sınırı girin.",
 "usage.retention.error": "Kullanım geçmişi boyut sınırı güncellenemedi.",
-  "usage.retention.disabled": "Sınırsız — otomatik geçmiş sıkıştırması kapalı.",
+  "usage.retention.disabled": "Sınırsız — otomatik geçmiş temizleme kapalı.",
 "usage.title": "Kullanım",
   "usage.subtitle": "Proxy'nizden yerel jeton muhasebesi.",
   "usage.loading": "Kullanım verileri yükleniyor…",

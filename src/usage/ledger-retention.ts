@@ -206,6 +206,7 @@ function truncateUsageLedger(ledgerPath: string, maxBytes: number): void {
     // Phase 1: Determine the valid retained range [retainedStart, retainedEnd)
     // First, check the end of the file. If it doesn't end with LF, find the last LF.
     let retainedEnd = fileSize;
+    let needsTrailingLf = false;
     const tailCheckSize = Math.min(fileSize, SCAN_CHUNK_BYTES);
     const tailBuffer = Buffer.allocUnsafe(tailCheckSize);
     const tailRead = readAllSync(inFd, tailBuffer, tailCheckSize, fileSize - tailCheckSize);
@@ -243,6 +244,7 @@ function truncateUsageLedger(ledgerPath: string, maxBytes: number): void {
         const tailValidation = validateRangeUsageRow(inFd, foundLastLf, fileSize);
         if (tailValidation === "valid") {
           retainedEnd = fileSize;
+          needsTrailingLf = true; // Append LF to temporary file so subsequent appends do not merge
         } else if (tailValidation === "unverifiable") {
           return; // Cannot prove invalidity; leave ledger unchanged
         } else {
@@ -353,6 +355,10 @@ function truncateUsageLedger(ledgerPath: string, maxBytes: number): void {
         writeAllSync(outFd, copyBuffer, bytesRead);
         copyOffset += bytesRead;
       }
+    }
+
+    if (needsTrailingLf) {
+      writeAllSync(outFd, Buffer.from("\n", "utf-8"), 1);
     }
 
     try { fsyncSync(outFd); } catch { /* best-effort */ }
