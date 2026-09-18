@@ -114,26 +114,52 @@ function isValidUsageRow(line: string): boolean {
   }
 }
 
-/** Validate a byte range in an open fd as a complete valid usage row without hardcoded size limits. */
-function isRangeValidUsageRow(fd: number, start: number, end: number): boolean {
+type RowValidation = "valid" | "invalid" | "unverifiable";
+
+/**
+ * Validate a byte range in an open fd as a complete valid usage row without unbounded memory allocations.
+ * Returns:
+ * - "valid": definitively valid and parseable as a normalized usage row.
+ * - "invalid": definitively malformed JSON or missing required fields.
+ * - "unverifiable": I/O error or excessive size exceeding memory allocation budget.
+ */
+function validateRangeUsageRow(fd: number, start: number, end: number): RowValidation {
   const len = end - start;
-  if (len <= 0) return false;
-  // Read using bounded chunks if small, or allocate up to the line length.
-  // Node.js Buffer.constants.MAX_LENGTH is 4 GiB on 64-bit; check safe integer bounds.
-  if (!Number.isSafeInteger(len) || len > 2 * 1024 * 1024 * 1024) return false;
+  if (len <= 0) return "invalid";
+  if (!Number.isSafeInteger(len)) return "unverifiable";
+
+  // Check start byte to catch truncated non-JSON without allocations
+  const peekBuf = Buffer.allocUnsafe(Math.min(len, 64));
+  let peekRead = 0;
+  try {
+    peekRead = readSync(fd, peekBuf, 0, peekBuf.length, start);
+  } catch {
+    return "unverifiable";
+  }
+  if (peekRead === 0) return "unverifiable";
+  const firstNonWs = peekBuf.subarray(0, peekRead).find(b => b !== 0x20 && b !== 0x09 && b !== 0x0d && b !== 0x0a);
+  if (firstNonWs !== 0x7b) return "invalid"; // Must start with '{'
+
+  // If reasonably sized (<= 64 MiB), allocate and parse completely
+  const MAX_PARSE_ALLOCATION = 64 * 1024 * 1024;
+  if (len > MAX_PARSE_ALLOCATION) {
+    // For rows larger than 64 MiB, memory pressure on the request path would be severe.
+    // Rather than classifying as corrupt and discarding, treat as unverifiable.
+    return "unverifiable";
+  }
+
   try {
     const buf = Buffer.allocUnsafe(len);
     let off = 0;
     while (off < len) {
       const r = readSync(fd, buf, off, len - off, start + off);
-      if (r === 0) break;
+      if (r === 0) return "unverifiable";
       off += r;
     }
-    if (off !== len) return false;
     const text = buf.toString("utf-8");
-    return isValidUsageRow(text);
+    return isValidUsageRow(text) ? "valid" : "invalid";
   } catch {
-    return false;
+    return "unverifiable";
   }
 }
 
@@ -189,10 +215,11 @@ function truncateUsageLedger(ledgerPath: string, maxBytes: number): void {
 
       if (foundLastLf === -1) {
         // No newline anywhere in the entire file.
-        if (isRangeValidUsageRow(inFd, 0, fileSize)) {
-          return; // Valid single oversized row, preserve original
+        const res = validateRangeUsageRow(inFd, 0, fileSize);
+        if (res === "valid" || res === "unverifiable") {
+          return; // Valid or unverifiable oversized row: preserve original file intact
         }
-        // Invalid or corrupt single line: write empty file
+        // Confirmed corrupt/invalid single line: discard by writing empty file
         retainedEnd = 0;
       } else {
         retainedEnd = foundLastLf;
@@ -243,14 +270,19 @@ function truncateUsageLedger(ledgerPath: string, maxBytes: number): void {
         }
 
         // Validate the newest oversized row
-        if (isRangeValidUsageRow(inFd, newestRowStart, retainedEnd)) {
+        const newestValidation = validateRangeUsageRow(inFd, newestRowStart, retainedEnd);
+        if (newestValidation === "valid") {
           if (newestRowStart === 0 && retainedEnd === fileSize) {
             return; // Sole line in file is a valid oversized row; preserve file
           }
           // The newest row is valid: discard older rows and retain this newest row
           retainedStart = newestRowStart;
+        } else if (newestValidation === "unverifiable") {
+          // Cannot prove invalidity (e.g. allocation failure or >64MB row).
+          // Do not delete: leave the original file untouched.
+          return;
         } else {
-          // The newest oversized row is corrupt: discard it, keep earlier complete rows
+          // Confirmed corrupt/invalid newest row: discard it, keep earlier complete rows
           retainedEnd = newestRowStart;
           retainedStart = 0;
           if (retainedEnd > maxBytes) {
