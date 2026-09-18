@@ -148,3 +148,31 @@ describe("GET /api/storage", () => {
     }
   });
 });
+
+describe("usage ledger retention management route", () => {
+  test("supports GET and PUT policy management", async () => {
+    const server = startServer(0);
+    try {
+      const status = await fetch(new URL("/api/storage/usage-ledger-retention", server.url));
+      expect(status.status).toBe(200);
+      expect(await status.json()).toMatchObject({ enabled: false, maxBytes: expect.any(Number), currentBytes: expect.any(Number) });
+
+      const updated = await fetch(new URL("/api/storage/usage-ledger-retention", server.url), {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ enabled: true, maxBytes: 8 * 1024 * 1024 }),
+      });
+      expect(updated.status).toBe(200);
+      expect(await updated.json()).toMatchObject({ enabled: true, maxBytes: 8 * 1024 * 1024 });
+
+      // Clean up config back to disabled
+      await fetch(new URL("/api/storage/usage-ledger-retention", server.url), {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ enabled: false }),
+      });
+    } finally {
+      await server.stop(true);
+    }
+  });
+});

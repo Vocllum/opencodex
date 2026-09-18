@@ -36,6 +36,9 @@ import { discardRetainedUsageSnapshot } from "./log";
 /** Floor: retention limits below this are treated as unconfigured. */
 export const MIN_USAGE_LEDGER_MAX_BYTES = 1024 * 1024; // 1 MiB
 
+/** Default ceiling when enabled through the GUI (1 GiB). */
+export const DEFAULT_USAGE_LEDGER_MAX_BYTES = 1024 * 1024 * 1024; // 1 GiB
+
 let truncationInProgress = false;
 
 /**
