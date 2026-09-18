@@ -957,6 +957,7 @@ export const vi: Record<TKey, string> = {
   "usage.retention.decrease": "Giảm kích thước tối đa",
   "usage.retention.unlimited": "Không giới hạn",
     "usage.retention.loadError": "Không thể tải giới hạn kích thước lịch sử sử dụng.",
+  "usage.retention.invalid": "Nhập giới hạn kích thước từ 1 đến {max} MiB.",
 "usage.retention.error": "Không thể cập nhật giới hạn kích thước lịch sử sử dụng.",
   "usage.retention.disabled": "Không giới hạn — tính năng tự động nén lịch sử đang tắt.",
 "usage.title": "Mức sử dụng",

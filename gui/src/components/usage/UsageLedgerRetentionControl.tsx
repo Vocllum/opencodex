@@ -133,7 +133,7 @@ export default function UsageLedgerRetentionControl({ apiBase }: { apiBase: stri
     }
     const nextMaxBytes = parseMaxMiBDraft(customDraft);
     if (nextMaxBytes === null) {
-      setError(t("usage.retention.error"));
+      setError(t("usage.retention.invalid", { max: MAX_MIB }));
       return;
     }
     void persist(true, nextMaxBytes);
@@ -188,6 +188,8 @@ export default function UsageLedgerRetentionControl({ apiBase }: { apiBase: stri
                 placeholder={mibLabel}
                 disabled={busy}
                 aria-label={t("usage.retention.limit")}
+                aria-invalid={error !== null}
+                aria-describedby={error ? "usage-retention-error" : undefined}
                 onFocus={() => setEditing(true)}
                 onChange={event => {
                   setError(null);
@@ -237,7 +239,7 @@ export default function UsageLedgerRetentionControl({ apiBase }: { apiBase: stri
           </>
         )}
       </p>
-      {error && <p className="err" role="alert">{error}</p>}
+      {error && <p id="usage-retention-error" className="err" role="alert">{error}</p>}
     </section>
   );
 }

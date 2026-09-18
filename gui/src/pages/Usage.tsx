@@ -1194,7 +1194,7 @@ export default function Usage({ apiBase, connected = false, apiKeyId }: { apiBas
           />
         </>
       )}
-      <UsageLedgerRetentionControl apiBase={apiBase} />
+      {!connected && <UsageLedgerRetentionControl apiBase={apiBase} />}
     </>
   );
 }

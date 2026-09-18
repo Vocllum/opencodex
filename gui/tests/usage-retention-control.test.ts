@@ -79,6 +79,37 @@ test("retention control stays on Usage and out of Storage", async () => {
   expect(storageWorkspace).not.toContain("UsageLedgerRetentionControl");
 });
 
+test("retention control is omitted when connected to remote hub", async () => {
+  const apiBase = "http://usage-connected-test";
+  const { createRoot } = await import("react-dom/client");
+  const Usage = (await import("../src/pages/Usage")).default;
+
+  globalThis.fetch = (async () => {
+    return Response.json({
+      range: "30d",
+      surface: "all",
+      since: 0,
+      generatedAt: Date.now(),
+      summary: { requests: 0, measuredRequests: 0, reportedRequests: 0, unreportedRequests: 0, unsupportedRequests: 0, estimatedRequests: 0, inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, reasoningOutputTokens: 0, totalTokens: 0, coverageRatio: 0 },
+      days: [],
+      models: [],
+      providers: [],
+      historyTruncated: false,
+      truncatedPrefixBytes: 0,
+      entriesTruncated: false,
+      entriesDropped: 0,
+    });
+  }) as typeof fetch;
+
+  await act(async () => {
+    root = createRoot(host);
+    root.render(createElement(LanguageProvider, null, createElement(Usage, { apiBase, connected: true })));
+  });
+  await settleTimers();
+
+  expect(host.querySelector('[data-testid="usage-ledger-retention"]')).toBeNull();
+});
+
 test("renders one switch and toggles without rewriting the saved byte ceiling", async () => {
   const apiBase = "http://usage-retention-test";
   const maxBytes = 512 * 1024 * 1024 + 17;
