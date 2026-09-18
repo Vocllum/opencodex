@@ -114,20 +114,27 @@ function isValidUsageRow(line: string): boolean {
   }
 }
 
-/** Validate a byte range in an open fd as a complete valid usage row. */
+/** Validate a byte range in an open fd as a complete valid usage row without hardcoded size limits. */
 function isRangeValidUsageRow(fd: number, start: number, end: number): boolean {
   const len = end - start;
-  if (len <= 0 || len > 10 * 1024 * 1024) return false;
-  const buf = Buffer.allocUnsafe(len);
-  let off = 0;
-  while (off < len) {
-    const r = readSync(fd, buf, off, len - off, start + off);
-    if (r === 0) break;
-    off += r;
+  if (len <= 0) return false;
+  // Read using bounded chunks if small, or allocate up to the line length.
+  // Node.js Buffer.constants.MAX_LENGTH is 4 GiB on 64-bit; check safe integer bounds.
+  if (!Number.isSafeInteger(len) || len > 2 * 1024 * 1024 * 1024) return false;
+  try {
+    const buf = Buffer.allocUnsafe(len);
+    let off = 0;
+    while (off < len) {
+      const r = readSync(fd, buf, off, len - off, start + off);
+      if (r === 0) break;
+      off += r;
+    }
+    if (off !== len) return false;
+    const text = buf.toString("utf-8");
+    return isValidUsageRow(text);
+  } catch {
+    return false;
   }
-  if (off !== len) return false;
-  const text = buf.toString("utf-8");
-  return isValidUsageRow(text);
 }
 
 /** Write all bytes from buffer to fd, retrying partial writes. */

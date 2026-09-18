@@ -249,6 +249,21 @@ describe("ledger-retention", () => {
       expect(content).not.toContain("old-1");
     });
 
+    test("preserves valid oversized row exceeding 10 MiB", () => {
+      const limit = MIN_USAGE_LEDGER_MAX_BYTES; // 1 MiB
+      setUsageLedgerMaxBytes(limit);
+
+      // Create a valid row > 10 MiB (11 MiB)
+      const hugeRow = makeRow("huge-row", 11 * 1024 * 1024);
+      writeFileSync(ledgerPath, hugeRow);
+      expect(statSync(ledgerPath).size).toBeGreaterThan(10 * 1024 * 1024);
+
+      enforceUsageLedgerSizeLimit(ledgerPath);
+
+      // Sole oversized valid row must be preserved
+      expect(statSync(ledgerPath).size).toBe(Buffer.byteLength(hugeRow, "utf-8"));
+    });
+
     test("deletes routing-history.sqlite after truncation", () => {
       const limit = 2048;
       setUsageLedgerMaxBytesUnsafe(limit);
