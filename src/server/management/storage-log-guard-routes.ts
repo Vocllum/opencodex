@@ -118,7 +118,7 @@ export async function handleStorageLogGuardRoutes(ctx: ManagementContext): Promi
   const protectionDeps = deps.codexLogGuardProtectionDeps;
 
   if (url.pathname === "/api/storage/usage-ledger-retention") {
-    if (ctx.principal !== "gui-session" && ctx.principal !== "admin-token") {
+    if (ctx.principal !== "gui-session") {
       return jsonResponse({ error: "GUI session required" }, 403, req, config);
     }
     if (req.method === "GET") {
