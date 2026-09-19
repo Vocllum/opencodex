@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { saveConfig } from "../../src/config";
 import { startServer } from "../../src/server";
+import { handleStorageLogGuardRoutes } from "../../src/server/management/storage-log-guard-routes";
 import type { OcxConfig } from "../../src/types";
 import { installIsolatedCodexHome, type IsolatedCodexHome } from "../helpers/isolated-codex-home";
 import { removeTreeWithRetry } from "../helpers/remove-tree";
@@ -150,6 +151,23 @@ describe("GET /api/storage", () => {
 });
 
 describe("usage ledger retention management route", () => {
+  test("rejects admin-token principals because the route is GUI-session-only", async () => {
+    const url = new URL("http://127.0.0.1/api/storage/usage-ledger-retention");
+    const response = await handleStorageLogGuardRoutes({
+      req: new Request(url),
+      url,
+      config: baseConfig(),
+      deps: {},
+      version: "test",
+      principal: "admin-token",
+      convergeCodexCatalog: async () => { throw new Error("unused"); },
+      syncClaudeAgentDefsBestEffort: async () => {},
+    });
+
+    expect(response?.status).toBe(403);
+    expect(await response?.json()).toEqual({ error: "GUI session required" });
+  });
+
   test("supports GET and PUT policy management", async () => {
     const server = startServer(0);
     try {
