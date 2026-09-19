@@ -117,24 +117,26 @@ export async function handleStorageLogGuardRoutes(ctx: ManagementContext): Promi
   const { req, url, config, deps } = ctx;
   const protectionDeps = deps.codexLogGuardProtectionDeps;
 
-  if (url.pathname === "/api/storage/usage-ledger-retention") {
+  if (url.pathname === "/api/storage/usage-ledger-retention" && req.method === "GET") {
     if (ctx.principal !== "gui-session") {
       return jsonResponse({ error: "GUI session required" }, 403, req, config);
     }
-    if (req.method === "GET") {
-      let currentBytes = 0;
-      try {
-        currentBytes = statSync(usageLogPath()).size;
-      } catch {
-        currentBytes = 0;
-      }
-      const enabled = typeof config.usageLedgerMaxBytes === "number" && config.usageLedgerMaxBytes >= MIN_USAGE_LEDGER_MAX_BYTES;
-      const maxBytes = enabled ? config.usageLedgerMaxBytes! : DEFAULT_USAGE_LEDGER_MAX_BYTES;
-      return jsonResponse({ enabled, maxBytes, currentBytes }, 200, req, config);
+    let currentBytes = 0;
+    try {
+      currentBytes = statSync(usageLogPath()).size;
+    } catch {
+      currentBytes = 0;
     }
+    const enabled = typeof config.usageLedgerMaxBytes === "number" && config.usageLedgerMaxBytes >= MIN_USAGE_LEDGER_MAX_BYTES;
+    const maxBytes = enabled ? config.usageLedgerMaxBytes! : DEFAULT_USAGE_LEDGER_MAX_BYTES;
+    return jsonResponse({ enabled, maxBytes, currentBytes }, 200, req, config);
+  }
 
-    if (req.method === "PUT") {
-      let body: unknown;
+  if (url.pathname === "/api/storage/usage-ledger-retention" && req.method === "PUT") {
+    if (ctx.principal !== "gui-session") {
+      return jsonResponse({ error: "GUI session required" }, 403, req, config);
+    }
+    let body: unknown;
       try {
         body = await readManagementJsonBody(req);
       } catch (error) {
@@ -185,7 +187,6 @@ export async function handleStorageLogGuardRoutes(ctx: ManagementContext): Promi
       }
 
       return jsonResponse({ enabled: candidate.enabled, maxBytes, currentBytes }, 200, req, config);
-    }
   }
 
   if (url.pathname === "/api/storage/codex-logs") {
