@@ -169,28 +169,37 @@ describe("usage ledger retention management route", () => {
   });
 
   test("supports GET and PUT policy management", async () => {
-    const server = startServer(0);
-    try {
-      const status = await fetch(new URL("/api/storage/usage-ledger-retention", server.url));
-      expect(status.status).toBe(200);
-      expect(await status.json()).toMatchObject({ enabled: false, maxBytes: expect.any(Number), currentBytes: expect.any(Number) });
+    const url = new URL("http://127.0.0.1/api/storage/usage-ledger-retention");
+    const cfg = baseConfig();
+    const getRes = await handleStorageLogGuardRoutes({
+      req: new Request(url),
+      url,
+      config: cfg,
+      deps: {},
+      version: "test",
+      principal: "gui-session",
+      convergeCodexCatalog: async () => { throw new Error("unused"); },
+      syncClaudeAgentDefsBestEffort: async () => {},
+    });
+    expect(getRes?.status).toBe(200);
+    expect(await getRes?.json()).toMatchObject({ enabled: false, maxBytes: expect.any(Number), currentBytes: expect.any(Number) });
 
-      const updated = await fetch(new URL("/api/storage/usage-ledger-retention", server.url), {
+    const putUrl = new URL("http://127.0.0.1/api/storage/usage-ledger-retention");
+    const putRes = await handleStorageLogGuardRoutes({
+      req: new Request(putUrl, {
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ enabled: true, maxBytes: 8 * 1024 * 1024 }),
-      });
-      expect(updated.status).toBe(200);
-      expect(await updated.json()).toMatchObject({ enabled: true, maxBytes: 8 * 1024 * 1024 });
-
-      // Clean up config back to disabled
-      await fetch(new URL("/api/storage/usage-ledger-retention", server.url), {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ enabled: false }),
-      });
-    } finally {
-      await server.stop(true);
-    }
+      }),
+      url: putUrl,
+      config: cfg,
+      deps: { saveConfigPreservingClaudeCode: () => {} },
+      version: "test",
+      principal: "gui-session",
+      convergeCodexCatalog: async () => { throw new Error("unused"); },
+      syncClaudeAgentDefsBestEffort: async () => {},
+    });
+    expect(putRes?.status).toBe(200);
+    expect(await putRes?.json()).toMatchObject({ enabled: true, maxBytes: 8 * 1024 * 1024 });
   });
 });
