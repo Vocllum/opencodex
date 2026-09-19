@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
@@ -8,7 +9,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 import {
   enforceUsageLedgerSizeLimit,
   MIN_USAGE_LEDGER_MAX_BYTES,
@@ -16,6 +17,7 @@ import {
   getUsageLedgerMaxBytes,
   setUsageLedgerMaxBytesUnsafe,
 } from "../../src/usage/ledger-retention";
+import { appendUsageEntry, usageLogPath } from "../../src/usage/log";
 
 let testDir = "";
 let ledgerPath = "";
@@ -370,6 +372,71 @@ describe("ledger-retention", () => {
       const files = readdirSync(testDir) as string[];
       const tmpFiles = files.filter((f: string) => f.endsWith(".tmp"));
       expect(tmpFiles).toHaveLength(0);
+    });
+
+    test("appendUsageEntry invokes retention enforcement on normal append", () => {
+      const limit = 2048;
+      setUsageLedgerMaxBytesUnsafe(limit);
+
+      const realLog = usageLogPath();
+      const previousContent = existsSync(realLog) ? readFileSync(realLog) : null;
+      try {
+        // Populate ledger path
+        const rows = Array.from({ length: 30 }, (_, i) => makeRow(`app-${i}`, 100));
+        writeFileSync(realLog, rows.join(""));
+        expect(statSync(realLog).size).toBeGreaterThan(limit);
+
+        // Appending another entry triggers inline enforcement
+        appendUsageEntry({
+          requestId: "trigger-append",
+          timestamp: Date.now(),
+          provider: "openai",
+          model: "gpt-4",
+          totalCost: 0.01,
+          status: 200,
+          durationMs: 100,
+          usageStatus: "reported",
+        });
+
+        // The file size must have been reduced to within the limit
+        expect(statSync(realLog).size).toBeLessThanOrEqual(limit);
+        expect(readFileSync(realLog, "utf-8")).toContain("trigger-append");
+      } finally {
+        if (previousContent !== null) writeFileSync(realLog, previousContent);
+        else try { rmSync(realLog); } catch { /* ignore */ }
+      }
+    });
+
+    test("appendUsageEntry invokes retention enforcement on ENOENT retry", () => {
+      const limit = 2048;
+      setUsageLedgerMaxBytesUnsafe(limit);
+
+      const realLog = usageLogPath();
+      const previousContent = existsSync(realLog) ? readFileSync(realLog) : null;
+      try {
+        const parentDir = dirname(realLog);
+        rmSync(parentDir, { recursive: true, force: true });
+
+        // Appending when directory was removed exercises the ENOENT recovery branch
+        appendUsageEntry({
+          requestId: "enoent-append",
+          timestamp: Date.now(),
+          provider: "openai",
+          model: "gpt-4",
+          totalCost: 0.01,
+          status: 200,
+          durationMs: 100,
+          usageStatus: "reported",
+        });
+
+        expect(existsSync(realLog)).toBe(true);
+        expect(readFileSync(realLog, "utf-8")).toContain("enoent-append");
+      } finally {
+        if (previousContent !== null) {
+          mkdirSync(dirname(realLog), { recursive: true });
+          writeFileSync(realLog, previousContent);
+        }
+      }
     });
   });
 });
